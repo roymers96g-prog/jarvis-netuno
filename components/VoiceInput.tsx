@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
 
 interface VoiceInputProps {
@@ -22,54 +22,37 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, isProcessi
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert("Tu navegador no soporta reconocimiento de voz. Por favor usa Google Chrome.");
+      alert("Tu navegador no soporta reconocimiento de voz nativo.");
       return;
     }
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.lang = 'es-ES'; // Default Spanish
-      recognition.continuous = false; // Changed to false for better mobile stability (Auto-stop on silence)
-      recognition.interimResults = true; // We want to see results as they come
+      recognition.lang = 'es-ES'; 
+      recognition.continuous = false; 
+      recognition.interimResults = false; // Simplified for robustness
 
       recognition.onstart = () => {
         updateListeningState(true);
       };
 
-      recognition.onresult = (event: any) => {
-        // Just grab the latest transcript
-        const current = event.resultIndex;
-        const transcript = event.results[current][0].transcript;
-        
-        // Optional: We could update a preview here if we wanted
-      };
-
       recognition.onerror = (event: any) => {
         console.error("Speech Recognition Error:", event.error);
         if (event.error === 'not-allowed') {
-          alert("Permiso de micrófono denegado. Habilítalo en la configuración del navegador.");
+          alert("Permiso de micrófono denegado.");
         }
-        if (event.error !== 'no-speech') {
-           // Don't alert on 'no-speech' as it happens frequently on silence
-           updateListeningState(false);
-        }
+        updateListeningState(false);
       };
 
       recognition.onend = () => {
         updateListeningState(false);
       };
 
-      // Custom property to accumulate final text if continuous was true, 
-      // but with continuous=false we just grab the result in onend or handle the specific result event.
-      // For this implementation (One command at a time):
       recognition.onresult = (event: any) => {
-          const lastResult = event.results[event.results.length - 1];
-          if (lastResult.isFinal) {
-              const text = lastResult[0].transcript.trim();
-              if (text) {
-                  onTranscript(text);
-              }
-          }
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          onTranscript(transcript);
+        }
       };
 
       recognitionRef.current = recognition;
@@ -77,14 +60,18 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, isProcessi
 
     } catch (error) {
       console.error("Failed to start recognition:", error);
-      alert("Error al iniciar el micrófono. Intenta recargar la página.");
+      alert("Error al iniciar micrófono.");
       updateListeningState(false);
     }
   };
 
   const stopListening = () => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.error("Error stopping", e);
+      }
       updateListeningState(false);
     }
   };

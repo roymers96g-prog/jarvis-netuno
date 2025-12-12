@@ -336,7 +336,7 @@ const App: React.FC = () => {
           
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold tracking-[0.2em] leading-none dark:text-zinc-100 text-slate-900">NETUNO</h1>
-            <span className="text-[10px] text-cyan-600 dark:text-cyan-500 font-mono tracking-widest font-bold">JARVIS PROTOCOL v2.0</span>
+            <span className="text-[10px] text-cyan-600 dark:text-cyan-500 font-mono tracking-widest font-bold">JARVIS PROTOCOL v3.0 NETWORK</span>
           </div>
         </div>
         
