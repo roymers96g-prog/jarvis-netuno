@@ -50,6 +50,14 @@ const RESPONSE_SCHEMA: Schema = {
 };
 
 export const processUserMessage = async (message: string, currentDate: string) => {
+  // OFFLINE CHECK
+  if (!navigator.onLine) {
+    return {
+      records: [],
+      jarvisResponse: "⚠️ Modo Sin Conexión. La IA no está disponible. Usa el menú de acceso rápido (botón cuadrícula) para registrar manualmente."
+    };
+  }
+
   try {
     const prices = getAllPrices();
     

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'netuno-jarvis-v16';
+const CACHE_NAME = 'netuno-jarvis-v17';
 const ASSETS = [
   '/',
   '/index.html',

@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { InstallationRecord, InstallType } from '../types';
 import { LABELS, COLORS } from '../constants';
 import { StatsCard } from './StatsCard';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { DollarSign, Activity, Calendar, Zap } from 'lucide-react';
+import { DollarSign, Activity, Calendar, Zap, Wifi, WifiOff } from 'lucide-react';
 
 interface DashboardProps {
   records: InstallationRecord[];
@@ -11,11 +11,24 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   
   const stats = useMemo(() => {
     const now = new Date();
     // Use Local Date String for comparison (YYYY-MM-DD in local time)
-    // This fixes the bug where "Today" (UTC) might differ from "Today" (Local)
     const todayStr = now.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD format
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -87,12 +100,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
           <h2 className="text-2xl font-bold dark:text-white text-slate-800 tracking-tight">Hola, {username || 'Técnico'}</h2>
           <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium">Panel de Control</p>
         </div>
-        <div className="flex items-center gap-1 text-[10px] bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded-full border border-green-500/20">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-          </span>
-          ONLINE
+        
+        {/* Dynamic Online/Offline Indicator */}
+        <div className={`flex items-center gap-1.5 text-[10px] px-3 py-1.5 rounded-full border font-bold transition-colors duration-500 ${
+          isOnline 
+            ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' 
+            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+        }`}>
+          {isOnline ? (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span className="tracking-wider">ONLINE</span>
+            </>
+          ) : (
+            <>
+              <WifiOff size={12} />
+              <span className="tracking-wider">OFFLINE</span>
+            </>
+          )}
         </div>
       </header>
 
