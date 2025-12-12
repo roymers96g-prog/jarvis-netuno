@@ -1,4 +1,5 @@
 {
+  "id": "netuno-jarvis-tracker",
   "name": "Netuno Jarvis",
   "short_name": "Jarvis",
   "start_url": ".",
@@ -6,6 +7,7 @@
   "background_color": "#09090b",
   "theme_color": "#09090b",
   "orientation": "portrait",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/6134/6134346.png?v=7",

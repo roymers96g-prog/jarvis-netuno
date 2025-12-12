@@ -11,6 +11,7 @@ import { QuickWidget } from './components/QuickWidget';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { NicknameModal } from './components/NicknameModal';
 import { WelcomeTutorial } from './components/WelcomeTutorial';
+import { InstallModal } from './components/InstallModal';
 import { InstallationRecord, ChatMessage, ExtractedData, InstallType, AppSettings } from './types';
 import { LABELS } from './constants';
 import { Send, Menu, X, Aperture, LayoutGrid, LayoutDashboard, List, Settings as SettingsIcon, Download, Share, Save } from 'lucide-react';
@@ -38,6 +39,7 @@ const App: React.FC = () => {
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -85,6 +87,7 @@ const App: React.FC = () => {
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      console.log("Install prompt captured");
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -179,15 +182,15 @@ const App: React.FC = () => {
   // PWA Install Handler
   const handleInstallClick = async () => {
     if (deferredPrompt) {
+      // Automatic Prompt available
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
       }
-    } else if (isIOS) {
-      alert("Para instalar en iOS: Toca el botón 'Compartir' (cuadrado con flecha) y selecciona 'Agregar a Inicio'.");
     } else {
-       alert("Si no ves el botón de instalación, busca la opción 'Instalar aplicación' en el menú de tu navegador.");
+      // Manual Instructions needed (iOS or prompt already dismissed/unavailable)
+      setIsInstallModalOpen(true);
     }
     setIsMenuOpen(false);
   };
@@ -311,13 +314,22 @@ const App: React.FC = () => {
          </div>
       </div>
 
-      {/* Nickname Modal - First Priority: User must identify themselves */}
+      {/* MODALS */}
+      
+      {/* 1. Install Instruction Modal */}
+      <InstallModal 
+        isOpen={isInstallModalOpen} 
+        onClose={() => setIsInstallModalOpen(false)} 
+        isIOS={isIOS}
+      />
+
+      {/* 2. Nickname Modal */}
       <NicknameModal 
         isOpen={isNicknameModalOpen} 
         onSave={handleSaveNickname} 
       />
 
-      {/* Tutorial - Shows after nickname is set (if needed) */}
+      {/* 3. Tutorial */}
       {showTutorial && !isNicknameModalOpen && (
         <WelcomeTutorial 
           onComplete={handleTutorialComplete} 
