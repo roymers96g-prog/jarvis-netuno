@@ -1,4 +1,4 @@
-const CACHE_NAME = 'netuno-jarvis-v17';
+const CACHE_NAME = 'netuno-jarvis-v18';
 const ASSETS = [
   '/',
   '/index.html',
@@ -32,17 +32,29 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // NETWORK FIRST STRATEGY
+  // NAVIGATION REQUESTS: Always return index.html (SPA Pattern)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          return caches.match('/index.html')
+            .then(response => response || caches.match('/'));
+        })
+    );
+    return;
+  }
+
+  // ASSET REQUESTS: Stale-While-Revalidate or Network First
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+        // Cache valid responses
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
         }
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
-        });
         return response;
       })
       .catch(() => {
