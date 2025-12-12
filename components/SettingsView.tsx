@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, InstallType } from '../types';
 import { LABELS } from '../constants';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { exportBackupData, importBackupData } from '../services/storageService';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, FileJson } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -12,6 +13,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [isSaved, setIsSaved] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing'>('checking');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const key = process.env.API_KEY;
@@ -53,6 +55,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
       navigator.clipboard.writeText(window.location.origin);
       alert("Enlace copiado.");
     }
+  };
+
+  const handleExport = () => {
+    const dataStr = exportBackupData();
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `netuno_backup_${new Date().toISOString().slice(0,10)}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (content) {
+        const success = importBackupData(content);
+        if (success) {
+          alert('¡Copia de seguridad restaurada correctamente! La página se recargará.');
+          window.location.reload();
+        } else {
+          alert('Error: El archivo no es válido.');
+        }
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    event.target.value = '';
   };
 
   return (
@@ -121,6 +161,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
             <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${localSettings.ttsEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
+      </section>
+
+      {/* Backup Section */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">SEGURIDAD DE DATOS</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <button 
+            onClick={handleExport}
+            className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-emerald-50/10 transition-colors group"
+          >
+            <Download size={24} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-bold dark:text-zinc-300 text-slate-600">Exportar Datos</span>
+          </button>
+
+          <button 
+            onClick={handleImportClick}
+            className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-blue-50/10 transition-colors group"
+          >
+            <Upload size={24} className="text-blue-500 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-bold dark:text-zinc-300 text-slate-600">Restaurar Copia</span>
+          </button>
+          
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".json"
+            className="hidden" 
+          />
+        </div>
+        <p className="text-[10px] text-center text-slate-400 dark:text-zinc-600 px-4">
+          Descarga un archivo .JSON para guardar tus registros o cárgalo en otro dispositivo.
+        </p>
       </section>
 
       {/* Price Settings */}

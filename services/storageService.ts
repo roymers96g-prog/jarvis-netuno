@@ -63,3 +63,25 @@ export const deleteRecord = (id: string): InstallationRecord[] => {
 export const clearAllData = () => {
   localStorage.removeItem(APP_STORAGE_KEY);
 };
+
+// Backup Functions
+export const exportBackupData = (): string => {
+  const records = getRecords();
+  return JSON.stringify(records, null, 2);
+};
+
+export const importBackupData = (jsonString: string): boolean => {
+  try {
+    const parsed = JSON.parse(jsonString);
+    if (Array.isArray(parsed)) {
+      // Basic validation: check if it looks like an array of records
+      // We overwrite current data or merge? Let's overwrite for simplicity of restoration
+      localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(parsed));
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error("Backup import failed", e);
+    return false;
+  }
+};
