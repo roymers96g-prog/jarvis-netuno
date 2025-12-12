@@ -1,4 +1,4 @@
-const CACHE_NAME = 'netuno-jarvis-v2';
+const CACHE_NAME = 'netuno-jarvis-v5'; // Versión actualizada para forzar recarga
 const ASSETS = [
   '/',
   '/index.html',
@@ -8,7 +8,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // Forces the new service worker to take over immediately
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
@@ -17,7 +17,6 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  // Clear old caches (v1) so users get the new v2 immediately
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(

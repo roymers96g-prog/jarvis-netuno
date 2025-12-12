@@ -105,7 +105,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
 
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 backdrop-blur-sm">
         <h3 className="text-slate-400 text-xs uppercase tracking-widest font-semibold mb-4">INGRESOS ÚLTIMOS 7 DÍAS</h3>
-        <div className="h-48 w-full">
+        {/* Fix: Added style with minHeight to prevent 0 height calculation error */}
+        <div className="w-full h-56 min-h-[224px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
               <XAxis dataKey="date" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
@@ -125,7 +126,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
 
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 backdrop-blur-sm flex flex-col items-center">
          <h3 className="text-slate-400 text-xs uppercase tracking-widest font-semibold mb-2 self-start">DISTRIBUCIÓN DE TRABAJO</h3>
-         <div className="h-48 w-full">
+         {/* Fix: Added style with minHeight to prevent 0 height calculation error */}
+         <div className="w-full h-56 min-h-[224px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie

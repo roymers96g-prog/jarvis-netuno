@@ -21,12 +21,17 @@
           extend: {
             keyframes: {
               fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              scaleIn: {
                 '0%': { opacity: '0', transform: 'scale(0.95)' },
                 '100%': { opacity: '1', transform: 'scale(1)' },
               }
             },
             animation: {
               fadeIn: 'fadeIn 0.2s ease-out forwards',
+              scaleIn: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             }
           }
         }
@@ -59,7 +64,9 @@
     "lucide-react": "https://esm.sh/lucide-react@^0.560.0",
     "recharts": "https://esm.sh/recharts@^3.5.1",
     "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "vite": "https://esm.sh/vite@^5.0.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^4.2.0"
   }
 }
 </script>
@@ -71,9 +78,19 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(registration => console.log('SW registered'))
-            .catch(err => console.log('SW registration failed: ', err));
+          // Check if we are in a secure context or localhost before registering
+          if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
+            navigator.serviceWorker.register('/sw.js')
+              .then(registration => console.log('SW registered'))
+              .catch(err => {
+                // Suppress confusing origin errors in preview environments
+                if (err.message && err.message.includes('origin')) {
+                  console.warn('Service Worker skipped: Preview environment detected.');
+                } else {
+                  console.error('SW registration failed:', err);
+                }
+              });
+          }
         });
       }
     </script>

@@ -14,7 +14,7 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
-      <div className="w-full max-w-sm dark:bg-slate-800/90 bg-white/95 border dark:border-slate-600 border-slate-200 rounded-3xl p-6 shadow-2xl transform transition-all scale-100" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-sm dark:bg-slate-800/90 bg-white/95 border dark:border-slate-600 border-slate-200 rounded-3xl p-6 shadow-2xl animate-scaleIn transform transition-all" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold dark:text-white text-slate-900 tracking-widest flex items-center gap-2">
             <Zap className="text-yellow-400" fill="currentColor" /> ACCESO RÁPIDO

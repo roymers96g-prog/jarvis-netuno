@@ -2,17 +2,16 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { InstallType } from "../types";
 import { getAllPrices } from "./settingsService";
 
-// Initialize Gemini lazily to avoid top-level crashes in browser environments
-// if process.env is not immediately available.
+// Initialize Gemini lazily
 let ai: GoogleGenAI | null = null;
 
 const getAiInstance = () => {
   if (!ai) {
-    // Safety check for API Key
+    // Usamos process.env.API_KEY directamente.
+    // El archivo vite.config.ts se encarga de rellenar esto durante el 'build' en Vercel.
     const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.warn("Gemini API Key is missing in process.env");
-    }
+    
+    // Inicialización estándar
     ai = new GoogleGenAI({ apiKey: apiKey || '' });
   }
   return ai;
@@ -95,16 +94,18 @@ export const processUserMessage = async (message: string, currentDate: string) =
 
   } catch (error) {
     console.error("Gemini Error:", error);
-    // Return a safe error message if the API key is missing or invalid
-    if (error instanceof Error && (error.message.includes("API key") || error.message.includes("403"))) {
-       return {
-        records: [],
-        jarvisResponse: "Error de autenticación: Verifica la configuración de la API Key en Vercel."
-      };
+    // Mensajes de error amigables según el tipo de fallo
+    if (error instanceof Error) {
+      if (error.message.includes("API key") || error.message.includes("403")) {
+         return {
+          records: [],
+          jarvisResponse: "⚠️ Error de Configuración: Asegúrate de que la variable 'API_KEY' esté agregada en Vercel (Settings > Environment Variables)."
+        };
+      }
     }
     return {
       records: [],
-      jarvisResponse: "Error en el procesamiento de datos. Sistema comprometido. Intente nuevamente."
+      jarvisResponse: "Error de conexión. Intente nuevamente."
     };
   }
 };

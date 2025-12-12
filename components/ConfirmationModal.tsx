@@ -14,7 +14,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, on
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
-      <div className="w-full max-w-sm bg-slate-800 border border-red-500/30 rounded-2xl p-6 shadow-2xl transform transition-all scale-100 shadow-red-900/20" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-sm bg-slate-800 border border-red-500/30 rounded-2xl p-6 shadow-2xl animate-scaleIn shadow-red-900/20" onClick={e => e.stopPropagation()}>
         <div className="flex flex-col items-center text-center mb-6">
           <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
             <AlertTriangle size={32} />
