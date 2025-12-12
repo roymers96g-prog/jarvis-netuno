@@ -17,7 +17,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Jarvis" />
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png?v=2" />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -143,27 +143,25 @@
   <body>
     <div id="root"></div>
     <!-- CRITICAL: Entry point for the React Application -->
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="/index.tsx?v=reset"></script>
     <script>
+      // EMERGENCY RESET SCRIPT
+      // If the app is stuck in 404 limbo, this tries to clear everything.
       if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+             // Unregister ALL existing service workers to clear broken cache
+             registration.unregister();
+             console.log('Service Worker Unregistered to fix 404');
+          }
+        });
+        
+        // Re-register the NEW clean service worker
         window.addEventListener('load', () => {
           if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
-            navigator.serviceWorker.register('/sw.js').then(reg => {
-              // Force update check
-              reg.onupdatefound = () => {
-                const installingWorker = reg.installing;
-                installingWorker.onstatechange = () => {
-                  if (installingWorker.state === 'installed') {
-                    if (navigator.serviceWorker.controller) {
-                      // New update available
-                      console.log('New content available; refreshing...');
-                      // Optional: Force reload if you want to be extremely aggressive
-                      // window.location.reload(); 
-                    }
-                  }
-                };
-              };
-            }).catch(console.error);
+            navigator.serviceWorker.register('/sw.js?v=reset12').then(reg => {
+              console.log('New Service Worker Registered');
+            });
           }
         });
       }
