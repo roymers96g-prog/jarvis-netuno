@@ -96,19 +96,18 @@
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
     <script>
-      // FORCED UPDATE LOGIC v5.0
+      // FORCED UPDATE LOGIC v5.1
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           // Unregister old broken workers first
           navigator.serviceWorker.getRegistrations().then(registrations => {
             for(let registration of registrations) {
-              // Unregistering allows the new one to take over cleanly
               registration.unregister();
             }
             // Register new worker with version query to bypass browser cache
             if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
-              navigator.serviceWorker.register('/sw.js?v=5.0').then(reg => {
-                console.log('SW Registered v5.0');
+              navigator.serviceWorker.register('/sw.js?v=5.1').then(reg => {
+                console.log('SW Registered v5.1');
               }).catch(err => console.log('SW Fail', err));
             }
           });

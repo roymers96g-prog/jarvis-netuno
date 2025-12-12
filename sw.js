@@ -1,4 +1,4 @@
-const CACHE_NAME = 'netuno-jarvis-v14-final';
+const CACHE_NAME = 'netuno-jarvis-v15-fixed';
 const ASSETS = [
   '/',
   '/index.html',
@@ -33,7 +33,6 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   // NETWORK FIRST STRATEGY
-  // Essential for dynamic apps like this one.
   event.respondWith(
     fetch(event.request)
       .then((response) => {

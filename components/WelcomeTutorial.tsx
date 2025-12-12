@@ -38,9 +38,9 @@ export const WelcomeTutorial: React.FC<WelcomeTutorialProps> = ({ onComplete, us
         </div>
         <div className="text-xl font-bold tracking-[0.2em] animate-pulse">INICIALIZANDO JARVIS...</div>
         <div className="mt-2 text-xs text-cyan-700 font-mono">
-          <div className="animate-slideUp" style={{ animationDelay: '0.2s' }}>> CARGANDO MÓDULOS DE IA... OK</div>
-          <div className="animate-slideUp" style={{ animationDelay: '0.8s' }}>> SINCRONIZANDO PRECIOS... OK</div>
-          <div className="animate-slideUp" style={{ animationDelay: '1.5s' }}>> ESTABLECIENDO CONEXIÓN SEGURA... OK</div>
+          <div className="animate-slideUp" style={{ animationDelay: '0.2s' }}>&gt; CARGANDO MÓDULOS DE IA... OK</div>
+          <div className="animate-slideUp" style={{ animationDelay: '0.8s' }}>&gt; SINCRONIZANDO PRECIOS... OK</div>
+          <div className="animate-slideUp" style={{ animationDelay: '1.5s' }}>&gt; ESTABLECIENDO CONEXIÓN SEGURA... OK</div>
         </div>
       </div>
     );
