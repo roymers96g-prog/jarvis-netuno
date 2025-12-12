@@ -2,6 +2,9 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { InstallType } from "../types";
 import { getAllPrices } from "./settingsService";
 
+// Declare process for TS to avoid build errors
+declare var process: any;
+
 // Initialize Gemini lazily
 let ai: GoogleGenAI | null = null;
 

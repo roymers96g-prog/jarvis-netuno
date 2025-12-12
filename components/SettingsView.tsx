@@ -4,6 +4,9 @@ import { LABELS } from '../constants';
 import { exportBackupData, importBackupData } from '../services/storageService';
 import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play } from 'lucide-react';
 
+// Declare process for TS
+declare var process: any;
+
 interface SettingsViewProps {
   settings: AppSettings;
   onSave: (newSettings: AppSettings) => void;

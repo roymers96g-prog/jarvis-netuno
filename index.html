@@ -17,7 +17,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Jarvis" />
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png?v=2" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png?v=3" />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -142,25 +142,15 @@
 </head>
   <body>
     <div id="root"></div>
-    <!-- CRITICAL: Entry point for the React Application -->
-    <script type="module" src="/index.tsx?v=reset"></script>
+    <!-- CRITICAL FIX: Removed query param that breaks Vite build -->
+    <script type="module" src="/index.tsx"></script>
     <script>
-      // EMERGENCY RESET SCRIPT
-      // If the app is stuck in 404 limbo, this tries to clear everything.
+      // Service Worker Registration
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-             // Unregister ALL existing service workers to clear broken cache
-             registration.unregister();
-             console.log('Service Worker Unregistered to fix 404');
-          }
-        });
-        
-        // Re-register the NEW clean service worker
         window.addEventListener('load', () => {
           if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
-            navigator.serviceWorker.register('/sw.js?v=reset12').then(reg => {
-              console.log('New Service Worker Registered');
+            navigator.serviceWorker.register('/sw.js').then(reg => {
+               // Optional: Logic to handle updates
             });
           }
         });
