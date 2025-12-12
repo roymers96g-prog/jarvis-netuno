@@ -1,4 +1,4 @@
-const CACHE_NAME = 'netuno-jarvis-v13-stable';
+const CACHE_NAME = 'netuno-jarvis-v14-final';
 const ASSETS = [
   '/',
   '/index.html',
@@ -22,7 +22,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('Limpiando caché antigua:', cacheName);
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -33,13 +33,10 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   // NETWORK FIRST STRATEGY
-  // 1. Try Network
-  // 2. Update Cache
-  // 3. Fallback to Cache if offline
+  // Essential for dynamic apps like this one.
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Only cache valid responses
         if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }

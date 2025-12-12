@@ -17,7 +17,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Jarvis" />
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png?v=3" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png?v=5" />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -27,54 +27,21 @@
         theme: {
           extend: {
             colors: {
-              // Custom elegant black scale
               zinc: {
                 850: '#1f1f22',
                 950: '#09090b', 
               }
             },
             keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              scaleIn: {
-                '0%': { opacity: '0', transform: 'scale(0.95)' },
-                '100%': { opacity: '1', transform: 'scale(1)' },
-              },
-              slideUp: {
-                '0%': { transform: 'translateY(20px)', opacity: '0' },
-                '100%': { transform: 'translateY(0)', opacity: '1' },
-              },
-              float: {
-                '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(-5px)' },
-              },
-              flash: {
-                '0%': { opacity: '0', transform: 'scale(0.95)' },
-                '10%': { opacity: '1', transform: 'scale(1)' },
-                '100%': { opacity: '0', transform: 'scale(1.05)' }
-              },
-              // Gemini Voice Animations
-              blob: {
-                '0%': { transform: 'translate(0px, 0px) scale(1)' },
-                '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
-                '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
-                '100%': { transform: 'translate(0px, 0px) scale(1)' }
-              },
-              wave: {
-                 '0%, 100%': { height: '10%' },
-                 '50%': { height: '100%' }
-              },
-              // New UI Animations
-              scanline: {
-                '0%': { top: '-10%' },
-                '100%': { top: '110%' }
-              },
-              'spin-slow': {
-                '0%': { transform: 'rotate(0deg)' },
-                '100%': { transform: 'rotate(360deg)' }
-              }
+              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+              scaleIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
+              slideUp: { '0%': { transform: 'translateY(20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+              float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } },
+              flash: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '10%': { opacity: '1', transform: 'scale(1)' }, '100%': { opacity: '0', transform: 'scale(1.05)' } },
+              blob: { '0%': { transform: 'translate(0px, 0px) scale(1)' }, '33%': { transform: 'translate(30px, -50px) scale(1.1)' }, '66%': { transform: 'translate(-20px, 20px) scale(0.9)' }, '100%': { transform: 'translate(0px, 0px) scale(1)' } },
+              wave: { '0%, 100%': { height: '10%' }, '50%': { height: '100%' } },
+              scanline: { '0%': { top: '-10%' }, '100%': { top: '110%' } },
+              'spin-slow': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }
             },
             animation: {
               fadeIn: 'fadeIn 0.4s ease-out forwards',
@@ -94,35 +61,20 @@
     <style>
       body {
         font-family: 'Rajdhani', sans-serif;
-        background-color: #09090b; /* Zinc 950 */
+        background-color: #09090b; 
         color: #e2e8f0; 
         -webkit-tap-highlight-color: transparent;
       }
-      
-      /* iOS Glassmorphism Utilities */
       .glass-panel {
         background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         border: 1px solid rgba(255, 255, 255, 0.5);
       }
-
       .dark .glass-panel {
-        background: rgba(24, 24, 27, 0.6); /* Zinc 900 with opacity */
+        background: rgba(24, 24, 27, 0.6); 
         border: 1px solid rgba(255, 255, 255, 0.08);
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
-      }
-
-      /* Scrollbar */
-      ::-webkit-scrollbar {
-        width: 4px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #52525b; 
-        border-radius: 4px;
       }
     </style>
   <script type="importmap">
@@ -142,17 +94,24 @@
 </head>
   <body>
     <div id="root"></div>
-    <!-- CRITICAL FIX: Removed query param that breaks Vite build -->
     <script type="module" src="/index.tsx"></script>
     <script>
-      // Service Worker Registration
+      // FORCED UPDATE LOGIC v5.0
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
-            navigator.serviceWorker.register('/sw.js').then(reg => {
-               // Optional: Logic to handle updates
-            });
-          }
+          // Unregister old broken workers first
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            for(let registration of registrations) {
+              // Unregistering allows the new one to take over cleanly
+              registration.unregister();
+            }
+            // Register new worker with version query to bypass browser cache
+            if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
+              navigator.serviceWorker.register('/sw.js?v=5.0').then(reg => {
+                console.log('SW Registered v5.0');
+              }).catch(err => console.log('SW Fail', err));
+            }
+          });
         });
       }
     </script>
