@@ -17,7 +17,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Jarvis" />
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png?v=5" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png?v=6" />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -96,21 +96,15 @@
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
     <script>
-      // FORCED UPDATE LOGIC v5.1
+      // Simplified Registration v6.0
+      // Removes complex unregistration logic to avoid "document invalid state" errors
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Unregister old broken workers first
-          navigator.serviceWorker.getRegistrations().then(registrations => {
-            for(let registration of registrations) {
-              registration.unregister();
-            }
-            // Register new worker with version query to bypass browser cache
-            if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
-              navigator.serviceWorker.register('/sw.js?v=5.1').then(reg => {
-                console.log('SW Registered v5.1');
-              }).catch(err => console.log('SW Fail', err));
-            }
-          });
+          if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
+            navigator.serviceWorker.register('/sw.js?v=6.0')
+              .then(reg => console.log('SW Registered v6.0'))
+              .catch(err => console.error('SW Registration Fail', err));
+          }
         });
       }
     </script>
