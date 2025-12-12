@@ -15,7 +15,25 @@ export const getRecords = (): InstallationRecord[] => {
 export const saveRecord = (type: InstallType, quantity: number, dateOverride?: string): InstallationRecord[] => {
   const currentRecords = getRecords();
   const newRecords: InstallationRecord[] = [];
-  const date = dateOverride ? new Date(dateOverride).toISOString() : new Date().toISOString();
+  
+  // DATE HANDLING FIX:
+  // If dateOverride is provided (YYYY-MM-DD from Gemini), append T12:00:00.
+  // This sets the time to Noon Local Time (effectively), avoiding the "UTC Midnight" bug
+  // where converting 00:00 UTC to local time shifts the date to the previous day (e.g., Dec 9 00:00 UTC = Dec 8 19:00 EST).
+  let dateObj: Date;
+
+  if (dateOverride) {
+    if (dateOverride.includes('T')) {
+      dateObj = new Date(dateOverride);
+    } else {
+      // Create date at noon to be safe against timezone shifts
+      dateObj = new Date(`${dateOverride}T12:00:00`);
+    }
+  } else {
+    dateObj = new Date();
+  }
+
+  const dateIsoString = dateObj.toISOString();
   
   // Fetch current price for this type from settings
   const unitPrice = getPrice(type);
@@ -24,9 +42,9 @@ export const saveRecord = (type: InstallType, quantity: number, dateOverride?: s
     newRecords.push({
       id: crypto.randomUUID(),
       type,
-      date: date,
+      date: dateIsoString,
       amount: unitPrice,
-      timestamp: Date.now() + i 
+      timestamp: dateObj.getTime() + i // Ensure slight difference for sorting
     });
   }
 

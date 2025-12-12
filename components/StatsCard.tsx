@@ -4,23 +4,26 @@ interface StatsCardProps {
   title: string;
   value: string | number;
   subValue?: string;
-  color?: string;
+  color?: string; // Text color class
   icon?: React.ReactNode;
 }
 
-export const StatsCard: React.FC<StatsCardProps> = ({ title, value, subValue, color = "text-cyan-400", icon }) => {
+export const StatsCard: React.FC<StatsCardProps> = ({ title, value, subValue, color = "text-cyan-600 dark:text-white", icon }) => {
   return (
-    <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl backdrop-blur-sm relative overflow-hidden group">
-      <div className={`absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity ${color}`}>
+    <div className="glass-panel p-4 rounded-2xl relative overflow-hidden group transition-transform hover:scale-[1.02]">
+      <div className={`absolute top-0 right-0 p-3 opacity-10 dark:opacity-20 group-hover:opacity-30 transition-opacity ${color}`}>
         {icon}
       </div>
-      <h3 className="text-slate-400 text-xs uppercase tracking-widest font-semibold mb-1">{title}</h3>
-      <div className="flex items-end gap-2">
-        <span className={`text-2xl font-bold ${color}`}>{value}</span>
-        {subValue && <span className="text-slate-500 text-xs mb-1">{subValue}</span>}
+      
+      <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-1">{title}</h3>
+      
+      <div className="flex items-end gap-2 relative z-10">
+        <span className={`text-2xl font-bold tracking-tight ${color}`}>{value}</span>
+        {subValue && <span className="text-slate-400 dark:text-zinc-600 text-xs mb-1 font-medium">{subValue}</span>}
       </div>
-      {/* Decorative tech line */}
-      <div className={`absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r from-transparent via-${color.replace('text-', 'bg-')}/50 to-transparent opacity-50`} />
+      
+      {/* Crystal reflection effect */}
+      <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none rotate-45" />
     </div>
   );
 };

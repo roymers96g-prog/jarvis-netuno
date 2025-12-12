@@ -5,33 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Netuno Jarvis Tracker</title>
     
+    <!-- Open Graph / WhatsApp Preview -->
+    <meta property="og:title" content="Netuno Jarvis Tracker" />
+    <meta property="og:description" content="Asistente IA para registro de producción técnica." />
+    <meta property="og:image" content="https://cdn-icons-png.flaticon.com/512/6134/6134346.png" />
+    <meta property="og:type" content="website" />
+
     <!-- PWA Settings -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#09090b" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Jarvis" />
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2593/2593468.png" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/6134/6134346.png" />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
+            colors: {
+              // Custom elegant black scale
+              zinc: {
+                850: '#1f1f22',
+                950: '#09090b', 
+              }
+            },
             keyframes: {
               fadeIn: {
                 '0%': { opacity: '0' },
                 '100%': { opacity: '1' },
               },
               scaleIn: {
-                '0%': { opacity: '0', transform: 'scale(0.9)' },
+                '0%': { opacity: '0', transform: 'scale(0.95)' },
                 '100%': { opacity: '1', transform: 'scale(1)' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-5px)' },
               }
             },
             animation: {
-              fadeIn: 'fadeIn 0.2s ease-out forwards',
+              fadeIn: 'fadeIn 0.4s ease-out forwards',
               scaleIn: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              slideUp: 'slideUp 0.5s ease-out forwards',
+              float: 'float 3s ease-in-out infinite',
             }
           }
         }
@@ -40,20 +64,35 @@
     <style>
       body {
         font-family: 'Rajdhani', sans-serif;
-        background-color: #0f172a; /* Slate 900 */
-        color: #e2e8f0; /* Slate 200 */
+        background-color: #09090b; /* Zinc 950 */
+        color: #e2e8f0; 
         -webkit-tap-highlight-color: transparent;
       }
-      /* Custom scrollbar for chat */
+      
+      /* iOS Glassmorphism Utilities */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+
+      .dark .glass-panel {
+        background: rgba(24, 24, 27, 0.6); /* Zinc 900 with opacity */
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Scrollbar */
       ::-webkit-scrollbar {
-        width: 6px;
+        width: 4px;
       }
       ::-webkit-scrollbar-track {
-        background: #1e293b; 
+        background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #06b6d4; 
-        border-radius: 3px;
+        background: #52525b; 
+        border-radius: 4px;
       }
     </style>
   <script type="importmap">
@@ -78,18 +117,8 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Check if we are in a secure context or localhost before registering
           if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
-            navigator.serviceWorker.register('/sw.js')
-              .then(registration => console.log('SW registered'))
-              .catch(err => {
-                // Suppress confusing origin errors in preview environments
-                if (err.message && err.message.includes('origin')) {
-                  console.warn('Service Worker skipped: Preview environment detected.');
-                } else {
-                  console.error('SW registration failed:', err);
-                }
-              });
+            navigator.serviceWorker.register('/sw.js').catch(console.error);
           }
         });
       }

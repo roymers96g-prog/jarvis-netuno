@@ -7,11 +7,7 @@ let ai: GoogleGenAI | null = null;
 
 const getAiInstance = () => {
   if (!ai) {
-    // Usamos process.env.API_KEY directamente.
-    // El archivo vite.config.ts se encarga de rellenar esto durante el 'build' en Vercel.
     const apiKey = process.env.API_KEY;
-    
-    // Inicialización estándar
     ai = new GoogleGenAI({ apiKey: apiKey || '' });
   }
   return ai;
@@ -28,15 +24,15 @@ const RESPONSE_SCHEMA: Schema = {
           type: {
             type: Type.STRING,
             enum: [InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE],
-            description: "The type of installation detected."
+            description: "El tipo de instalación detectada."
           },
           quantity: {
             type: Type.INTEGER,
-            description: "Number of installations of this type."
+            description: "Cantidad de instalaciones."
           },
           date: {
             type: Type.STRING,
-            description: "Date of installation in ISO 8601 format (YYYY-MM-DD). If not specified by user, use today's date."
+            description: "Fecha de la instalación en formato ISO 8601 (YYYY-MM-DD). DEBE ser calculada con precisión."
           }
         },
         required: ["type", "quantity"]
@@ -44,7 +40,7 @@ const RESPONSE_SCHEMA: Schema = {
     },
     jarvisResponse: {
       type: Type.STRING,
-      description: "A very brief, efficient, robotic response confirming the action. Style: Jarvis/Iron Man interface."
+      description: "Respuesta de Jarvis. SIEMPRE menciona qué se guardó y PARA QUÉ FECHA se guardó."
     }
   },
   required: ["records", "jarvisResponse"]
@@ -55,25 +51,31 @@ export const processUserMessage = async (message: string, currentDate: string) =
     const prices = getAllPrices();
     
     const prompt = `
-      Current Date: ${currentDate}
+      Fecha y Hora Actual del Sistema: ${new Date().toLocaleString('es-ES')}
       
-      You are Jarvis, an advanced AI production tracking assistant for a fiber optic technician working for Netuno.
+      Eres Jarvis, el asistente de registros de Netuno.
       
-      Your specific task is to extract installation records from the user's natural language input.
+      Tus Objetivos:
+      1. Extraer instalaciones (Residencial, Corporativa, Poste) del texto.
+      2. Determinar la fecha exacta del registro.
       
-      Installation Types and Current Configured Values:
-      1. RESIDENTIAL (Residential) - valued at $${prices[InstallType.RESIDENTIAL]}
-      2. CORPORATE (Corporativa/Empresarial) - valued at $${prices[InstallType.CORPORATE]}
-      3. POSTE (Post/Poste/Pole) - valued at $${prices[InstallType.POSTE]}
+      Manejo de Fechas (CRÍTICO):
+      - Si el usuario dice "hoy", usa la fecha actual.
+      - Si el usuario dice "ayer", resta 1 día a la fecha actual.
+      - Si el usuario dice "9 de diciembre" o "el 9", asume el año actual o el más lógico (no futuro).
+      - Retorna la fecha SIEMPRE en formato YYYY-MM-DD.
       
-      Rules:
-      - Analyze the user's text to find counts of these specific installation types.
-      - If the user says "hice 3 instalaciones hoy", and doesn't specify type, assume RESIDENTIAL (most common) or ask for clarification in the 'jarvisResponse' if ambiguous, but prefer making a logical guess based on context if possible to be "efficient". 
-      - If the user provides a past date (e.g., "yesterday", "last friday"), calculate the correct ISO date based on "Current Date".
-      - Be extremely efficient. Do not chat casually. confirm execution.
-      - If the user input is NOT about adding records (e.g., "hello", "who are you"), return an empty 'records' array and a polite Jarvis-like response.
+      Respuesta (jarvisResponse):
+      - Debe ser en Español.
+      - Estilo eficiente y tecnológico.
+      - **IMPORTANTE**: Confirma explícitamente la fecha. Ejemplo: "3 residenciales registradas para el 9 de diciembre." o "Guardado correctamente con fecha de hoy."
       
-      User Input: "${message}"
+      Valores Configurados:
+      - Residential: $${prices[InstallType.RESIDENTIAL]}
+      - Corporate: $${prices[InstallType.CORPORATE]}
+      - Poste: $${prices[InstallType.POSTE]}
+      
+      Input del Usuario: "${message}"
     `;
 
     const aiInstance = getAiInstance();
@@ -94,12 +96,11 @@ export const processUserMessage = async (message: string, currentDate: string) =
 
   } catch (error) {
     console.error("Gemini Error:", error);
-    // Mensajes de error amigables según el tipo de fallo
     if (error instanceof Error) {
       if (error.message.includes("API key") || error.message.includes("403")) {
          return {
           records: [],
-          jarvisResponse: "⚠️ Error de Autenticación: Falta la API_KEY. Agrégala en las Variables de Entorno de Vercel (o en tu archivo .env local)."
+          jarvisResponse: "⚠️ Error: Falta la API Key."
         };
       }
     }
