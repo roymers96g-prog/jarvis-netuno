@@ -1,4 +1,4 @@
-const CACHE_NAME = 'netuno-jarvis-v5'; // Versión actualizada para forzar recarga
+const CACHE_NAME = 'netuno-jarvis-v6'; // Versión actualizada para forzar recarga
 const ASSETS = [
   '/',
   '/index.html',

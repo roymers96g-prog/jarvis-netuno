@@ -10,8 +10,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Inyectar la API Key de forma segura durante el build
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY)
+      // Inyectar la API Key de forma segura durante el build.
+      // Si no existe, inyectamos una cadena vacía "" para evitar 'undefined' en el código compilado.
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || "")
     },
     build: {
       // Aumentamos el límite de advertencia para que no moleste en el log

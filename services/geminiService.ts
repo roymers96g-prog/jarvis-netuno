@@ -99,7 +99,7 @@ export const processUserMessage = async (message: string, currentDate: string) =
       if (error.message.includes("API key") || error.message.includes("403")) {
          return {
           records: [],
-          jarvisResponse: "⚠️ Error de Configuración: Asegúrate de que la variable 'API_KEY' esté agregada en Vercel (Settings > Environment Variables)."
+          jarvisResponse: "⚠️ Error de Autenticación: Falta la API_KEY. Agrégala en las Variables de Entorno de Vercel (o en tu archivo .env local)."
         };
       }
     }
