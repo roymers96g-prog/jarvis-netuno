@@ -3,11 +3,8 @@ import { InstallType } from "../types";
 import { getAllPrices, getEffectiveApiKey } from "./settingsService";
 
 // Initialize Gemini lazily
-// We do NOT cache the instance globally anymore to ensure 
-// we pick up the new key immediately if the user updates it in settings.
-
-const getAiInstance = () => {
-  const apiKey = getEffectiveApiKey();
+const getAiInstance = (explicitKey?: string) => {
+  const apiKey = explicitKey || getEffectiveApiKey();
   if (!apiKey) {
     throw new Error("API Key missing");
   }
@@ -45,6 +42,22 @@ const RESPONSE_SCHEMA: Schema = {
     }
   },
   required: ["records", "jarvisResponse"]
+};
+
+// Function to test the API Key specifically
+export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    // Simple prompt to test connectivity
+    await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: "Test connection",
+    });
+    return true;
+  } catch (e) {
+    console.error("Validation failed", e);
+    return false;
+  }
 };
 
 export const processUserMessage = async (message: string, currentDate: string) => {
@@ -109,13 +122,13 @@ export const processUserMessage = async (message: string, currentDate: string) =
       if (error.message.includes("API Key missing") || error.message.includes("403") || error.message.includes("API key")) {
          return {
           records: [],
-          jarvisResponse: "⚠️ Error: Falta la API Key. Por favor, ingrésala en Configuración."
+          jarvisResponse: "⚠️ Error: Falta la API Key o es inválida. Verifica en Configuración."
         };
       }
     }
     return {
       records: [],
-      jarvisResponse: "Error de conexión o configuración. Verifica tu API Key en Ajustes."
+      jarvisResponse: "Error de conexión con IA. Verifica tu internet y tu API Key."
     };
   }
 };

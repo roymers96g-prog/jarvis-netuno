@@ -12,7 +12,7 @@
     <meta property="og:type" content="website" />
 
     <!-- PWA Settings -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#09090b" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -94,12 +94,13 @@
 </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
     <script>
       // Force SW update check
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js?v=7.1')
+          // Changed to relative path ./sw.js to avoid origin issues
+          navigator.serviceWorker.register('./sw.js?v=7.1')
             .then(reg => {
               reg.onupdatefound = () => {
                 const installingWorker = reg.installing;

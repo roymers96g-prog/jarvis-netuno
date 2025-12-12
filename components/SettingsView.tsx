@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, InstallType } from '../types';
 import { LABELS } from '../constants';
 import { exportBackupData, importBackupData } from '../services/storageService';
-import { getEffectiveApiKey } from '../services/settingsService';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key } from 'lucide-react';
+import { validateApiKey } from '../services/geminiService';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2 } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -13,19 +13,19 @@ interface SettingsViewProps {
 export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) => {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [isSaved, setIsSaved] = useState(false);
-  const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing'>('checking');
+  const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing' | 'validating'>('checking');
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check effective API Key status
+  // Check input validity visually
   useEffect(() => {
-    const key = getEffectiveApiKey();
-    if (key && key.length > 10) {
-      setApiKeyStatus('ok');
+    const key = localSettings.apiKey?.trim();
+    if (key && key.length > 20) {
+      if (apiKeyStatus !== 'validating') setApiKeyStatus('ok');
     } else {
       setApiKeyStatus('missing');
     }
-  }, [localSettings.apiKey]); // Re-check when user types
+  }, [localSettings.apiKey]);
 
   useEffect(() => {
     // Load voices
@@ -60,6 +60,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     onSave(localSettings);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
+  };
+
+  const handleTestApiKey = async () => {
+    const key = localSettings.apiKey?.trim();
+    if (!key) return;
+
+    setApiKeyStatus('validating');
+    // Force save first so service can use it if needed, though we validate explicitly
+    onSave(localSettings);
+    
+    const isValid = await validateApiKey(key);
+    if (isValid) {
+      setApiKeyStatus('ok');
+      alert("✅ ¡Conexión Exitosa! La API Key funciona correctamente.");
+    } else {
+      setApiKeyStatus('missing');
+      alert("❌ Error: La API Key no funciona. Verifica que la copiaste correctamente.");
+    }
   };
 
   const handleTestVoice = () => {
@@ -145,16 +163,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
         }`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              {apiKeyStatus === 'ok' ? <CheckCircle className="text-emerald-500" /> : <XCircle className="text-red-500" />}
+              {apiKeyStatus === 'validating' ? (
+                 <Loader2 className="animate-spin text-cyan-500" />
+              ) : apiKeyStatus === 'ok' ? (
+                 <CheckCircle className="text-emerald-500" /> 
+              ) : (
+                 <XCircle className="text-red-500" />
+              )}
               <div>
-                <span className={`block font-bold text-sm ${apiKeyStatus === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'}`}>IA Gemini</span>
-                <span className="text-[10px] dark:text-zinc-500 text-slate-500">{apiKeyStatus === 'ok' ? 'Conectado' : 'Sin API Key'}</span>
+                <span className={`block font-bold text-sm ${apiKeyStatus === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : apiKeyStatus === 'validating' ? 'text-cyan-500' : 'text-red-600'}`}>
+                  IA Gemini
+                </span>
+                <span className="text-[10px] dark:text-zinc-500 text-slate-500">
+                  {apiKeyStatus === 'ok' ? 'Listo para usar' : apiKeyStatus === 'validating' ? 'Verificando...' : 'Sin conexión'}
+                </span>
               </div>
             </div>
-            <div className={`w-2 h-2 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`} />
+            <div className={`w-2 h-2 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500' : 'bg-red-500'}`} />
           </div>
 
-          <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-3">
+          <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-3 mb-3">
             <label className="text-xs font-bold text-slate-500 dark:text-zinc-400 mb-2 block flex items-center gap-2">
               <Key size={12} /> Google Gemini API Key
             </label>
@@ -162,13 +190,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
               type="password"
               value={localSettings.apiKey}
               onChange={(e) => setLocalSettings(p => ({ ...p, apiKey: e.target.value }))}
-              placeholder="Pega tu llave aquí (AIzaSy...)"
+              placeholder="Pega tu llave aquí..."
               className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-sm dark:text-white text-slate-900 pb-2 placeholder:text-slate-400 font-mono"
             />
-            <p className="text-[10px] text-slate-400 mt-2 leading-tight">
-              Si tienes problemas de conexión, pega tu API Key aquí manualmente. Se guardará de forma segura en tu dispositivo.
-            </p>
           </div>
+
+          <button 
+            onClick={handleTestApiKey}
+            disabled={!localSettings.apiKey || apiKeyStatus === 'validating'}
+            className="w-full py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {apiKeyStatus === 'validating' ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
+            PROBAR Y GUARDAR LLAVE
+          </button>
         </div>
       </section>
 
@@ -363,7 +397,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
           }`}
         >
           <Save size={18} />
-          {isSaved ? 'GUARDADO' : 'GUARDAR'}
+          {isSaved ? 'GUARDADO' : 'GUARDAR TODO'}
         </button>
       </div>
       
