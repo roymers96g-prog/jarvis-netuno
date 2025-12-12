@@ -3,9 +3,10 @@ import { Bot, Mic, LayoutGrid, CheckCircle, ArrowRight } from 'lucide-react';
 
 interface WelcomeTutorialProps {
   onComplete: () => void;
+  username?: string;
 }
 
-export const WelcomeTutorial: React.FC<WelcomeTutorialProps> = ({ onComplete }) => {
+export const WelcomeTutorial: React.FC<WelcomeTutorialProps> = ({ onComplete, username }) => {
   const [step, setStep] = useState(0);
   const [isBooting, setIsBooting] = useState(true);
 
@@ -63,7 +64,7 @@ export const WelcomeTutorial: React.FC<WelcomeTutorialProps> = ({ onComplete }) 
                 <Bot size={40} className="text-white" />
               </div>
               <div>
-                <h2 className="text-3xl font-bold text-white mb-2">HOLA, TÉCNICO</h2>
+                <h2 className="text-3xl font-bold text-white mb-2">HOLA, {username ? username.toUpperCase() : 'TÉCNICO'}</h2>
                 <p className="text-slate-400">Soy Jarvis, tu asistente personal para el registro de instalaciones.</p>
               </div>
               <div className="bg-white/5 p-4 rounded-xl border border-white/5 text-sm text-slate-300">

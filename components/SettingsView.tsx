@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, InstallType } from '../types';
 import { LABELS } from '../constants';
 import { exportBackupData, importBackupData } from '../services/storageService';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, FileJson } from 'lucide-react';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -13,6 +13,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [isSaved, setIsSaved] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing'>('checking');
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -22,6 +23,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     } else {
       setApiKeyStatus('missing');
     }
+
+    // Load voices
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      // Filter primarily for Spanish, but keep others if needed
+      const spanishVoices = voices.filter(v => v.lang.startsWith('es'));
+      setAvailableVoices(spanishVoices.length > 0 ? spanishVoices : voices);
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
   }, []);
 
   const handleChangePrice = (type: InstallType, val: string) => {
@@ -41,6 +57,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     onSave(localSettings);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
+  };
+
+  const handleTestVoice = () => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance("Hola señor. Los sistemas están operando al cien por ciento.");
+    utterance.lang = 'es-ES';
+    utterance.pitch = localSettings.voiceSettings.pitch;
+    utterance.rate = localSettings.voiceSettings.rate;
+    
+    if (localSettings.voiceSettings.voiceURI) {
+      const selectedVoice = availableVoices.find(v => v.voiceURI === localSettings.voiceSettings.voiceURI);
+      if (selectedVoice) utterance.voice = selectedVoice;
+    }
+    
+    window.speechSynthesis.speak(utterance);
   };
 
   const handleShare = async () => {
@@ -91,7 +122,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
       }
     };
     reader.readAsText(file);
-    // Reset input
     event.target.value = '';
   };
 
@@ -104,6 +134,99 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
         </h2>
         <p className="dark:text-zinc-500 text-slate-500 text-sm">Personaliza tu experiencia.</p>
       </header>
+
+      {/* Profile Section */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PERFIL</h3>
+        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl">
+          <div className="flex items-center gap-3">
+            <User className="text-cyan-600 dark:text-zinc-400" />
+            <div>
+              <span className="block font-bold dark:text-white text-slate-800 text-sm">Nombre de Usuario</span>
+              <span className="text-[10px] dark:text-zinc-500 text-slate-500">
+                Así te llamará Jarvis
+              </span>
+            </div>
+          </div>
+          <input 
+             type="text"
+             value={localSettings.nickname}
+             onChange={(e) => setLocalSettings(p => ({ ...p, nickname: e.target.value }))}
+             placeholder="Técnico"
+             className="w-32 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-medium text-sm dark:text-white text-slate-900"
+          />
+        </div>
+      </section>
+
+      {/* Voice Settings Section */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">SINTETIZADOR DE VOZ</h3>
+        <div className="glass-panel p-4 rounded-2xl space-y-4">
+           <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Mic className="text-cyan-500" />
+                <div>
+                  <span className="block font-bold dark:text-white text-slate-800 text-sm">Voz de Jarvis</span>
+                  <span className="text-[10px] dark:text-zinc-500 text-slate-500">Selecciona la voz más parecida</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setLocalSettings(p => ({ ...p, ttsEnabled: !p.ttsEnabled }))}
+                className={`w-12 h-7 rounded-full p-1 transition-colors ${localSettings.ttsEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-zinc-700'}`}
+              >
+                <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${localSettings.ttsEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+           </div>
+
+           {localSettings.ttsEnabled && (
+             <div className="space-y-4 pt-2 border-t border-slate-200 dark:border-zinc-700">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 dark:text-zinc-400">Selección de Voz</label>
+                  <select 
+                    value={localSettings.voiceSettings.voiceURI}
+                    onChange={(e) => setLocalSettings(p => ({ ...p, voiceSettings: { ...p.voiceSettings, voiceURI: e.target.value } }))}
+                    className="w-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg p-2 text-sm dark:text-white"
+                  >
+                    <option value="">Automático (Recomendado)</option>
+                    {availableVoices.map(v => (
+                      <option key={v.voiceURI} value={v.voiceURI}>
+                        {v.name} ({v.lang})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 dark:text-zinc-400">Tono (Pitch): {localSettings.voiceSettings.pitch}</label>
+                    <input 
+                      type="range" min="0.5" max="2" step="0.1"
+                      value={localSettings.voiceSettings.pitch}
+                      onChange={(e) => setLocalSettings(p => ({ ...p, voiceSettings: { ...p.voiceSettings, pitch: parseFloat(e.target.value) } }))}
+                      className="w-full accent-cyan-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 dark:text-zinc-400">Velocidad: {localSettings.voiceSettings.rate}</label>
+                    <input 
+                      type="range" min="0.5" max="2" step="0.1"
+                      value={localSettings.voiceSettings.rate}
+                      onChange={(e) => setLocalSettings(p => ({ ...p, voiceSettings: { ...p.voiceSettings, rate: parseFloat(e.target.value) } }))}
+                      className="w-full accent-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleTestVoice}
+                  className="w-full py-2 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-colors text-slate-700 dark:text-zinc-300"
+                >
+                  <Play size={14} /> PROBAR VOZ
+                </button>
+             </div>
+           )}
+        </div>
+      </section>
 
       {/* System Status */}
       <section className="space-y-3">
@@ -122,11 +245,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
         </div>
       </section>
 
-      {/* General Settings */}
+      {/* Preferences Section */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PREFERENCIAS</h3>
-        
-        {/* Theme Toggle */}
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PREFERENCIAS VISUALES</h3>
         <div className="flex items-center justify-between p-4 glass-panel rounded-2xl">
           <div className="flex items-center gap-3">
             {localSettings.theme === 'dark' ? <Moon className="text-zinc-400" /> : <Sun className="text-amber-500" />}
@@ -142,23 +263,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
             className={`w-12 h-7 rounded-full p-1 transition-colors ${localSettings.theme === 'dark' ? 'bg-zinc-700' : 'bg-cyan-200'}`}
           >
             <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${localSettings.theme === 'dark' ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
-        </div>
-
-        {/* TTS Toggle */}
-        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl">
-          <div className="flex items-center gap-3">
-            {localSettings.ttsEnabled ? <Volume2 className="text-emerald-500" /> : <VolumeX className="text-red-400" />}
-            <div>
-              <span className="block font-bold dark:text-white text-slate-800 text-sm">Voz de Jarvis</span>
-              <span className="text-[10px] dark:text-zinc-500 text-slate-500">Lectura de respuestas</span>
-            </div>
-          </div>
-          <button 
-            onClick={() => setLocalSettings(p => ({ ...p, ttsEnabled: !p.ttsEnabled }))}
-            className={`w-12 h-7 rounded-full p-1 transition-colors ${localSettings.ttsEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-zinc-700'}`}
-          >
-            <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${localSettings.ttsEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
       </section>

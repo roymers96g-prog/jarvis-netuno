@@ -7,9 +7,10 @@ import { DollarSign, Activity, Calendar, Zap } from 'lucide-react';
 
 interface DashboardProps {
   records: InstallationRecord[];
+  username: string;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
   
   const stats = useMemo(() => {
     const now = new Date();
@@ -83,7 +84,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
     <div className="space-y-6 pb-24 animate-fadeIn">
       <header className="mb-6 flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-bold dark:text-white text-slate-800 tracking-tight">Hola, Técnico</h2>
+          <h2 className="text-2xl font-bold dark:text-white text-slate-800 tracking-tight">Hola, {username || 'Técnico'}</h2>
           <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium">Panel de Control</p>
         </div>
         <div className="flex items-center gap-1 text-[10px] bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded-full border border-green-500/20">

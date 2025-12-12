@@ -36,10 +36,18 @@ export interface ExtractedData {
   jarvisResponse: string;
 }
 
+export interface VoiceSettings {
+  voiceURI: string;
+  pitch: number;
+  rate: number;
+}
+
 export interface AppSettings {
+  nickname: string;
   ttsEnabled: boolean;
   theme: 'dark' | 'light';
   customPrices: {
     [key in InstallType]: number;
   };
+  voiceSettings: VoiceSettings;
 }

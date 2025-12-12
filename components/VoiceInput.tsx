@@ -1,74 +1,100 @@
-import React, { useState, useRef } from 'react';
-import { Mic, MicOff } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Mic, MicOff, Loader2 } from 'lucide-react';
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
   isProcessing: boolean;
+  onStateChange?: (isListening: boolean) => void;
 }
 
-export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, isProcessing }) => {
+export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, isProcessing, onStateChange }) => {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
-  const transcriptBuffer = useRef<string>("");
 
-  // Web Speech API check
-  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-  const toggleListening = () => {
-    if (!SpeechRecognition) {
-      alert("Tu navegador no soporta reconocimiento de voz. Usa Chrome o Safari.");
-      return;
-    }
-
-    if (listening) {
-      // User manually stops recording
-      recognitionRef.current?.stop();
-    } else {
-      startListening();
-    }
+  // Helper to notify parent of state changes
+  const updateListeningState = (state: boolean) => {
+    setListening(state);
+    if (onStateChange) onStateChange(state);
   };
 
   const startListening = () => {
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'es-ES';
-    recognition.continuous = true; // Enable continuous recording
-    recognition.interimResults = true; // Capture interim results to keep stream active
+    // Browser compatibility check
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    recognition.onstart = () => {
-      setListening(true);
-      transcriptBuffer.current = ""; // Reset buffer
-    };
+    if (!SpeechRecognition) {
+      alert("Tu navegador no soporta reconocimiento de voz. Por favor usa Google Chrome.");
+      return;
+    }
 
-    recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      
-      // SpeechRecognition with continuous=true returns a list of results.
-      // We must reconstruct the full sentence from the array.
-      for (let i = 0; i < event.results.length; ++i) {
-        finalTranscript += event.results[i][0].transcript;
-      }
-      
-      transcriptBuffer.current = finalTranscript;
-    };
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'es-ES'; // Default Spanish
+      recognition.continuous = false; // Changed to false for better mobile stability (Auto-stop on silence)
+      recognition.interimResults = true; // We want to see results as they come
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech Recognition Error:", event.error);
-      // If no speech was detected, just stop.
-      if (event.error === 'no-speech') {
-        setListening(false);
-      }
-    };
+      recognition.onstart = () => {
+        updateListeningState(true);
+      };
 
-    recognition.onend = () => {
-      setListening(false);
-      // Send the accumulated text when recording stops (either manual or auto-stop)
-      if (transcriptBuffer.current.trim()) {
-        onTranscript(transcriptBuffer.current.trim());
-      }
-    };
+      recognition.onresult = (event: any) => {
+        // Just grab the latest transcript
+        const current = event.resultIndex;
+        const transcript = event.results[current][0].transcript;
+        
+        // Optional: We could update a preview here if we wanted
+      };
 
-    recognitionRef.current = recognition;
-    recognition.start();
+      recognition.onerror = (event: any) => {
+        console.error("Speech Recognition Error:", event.error);
+        if (event.error === 'not-allowed') {
+          alert("Permiso de micrófono denegado. Habilítalo en la configuración del navegador.");
+        }
+        if (event.error !== 'no-speech') {
+           // Don't alert on 'no-speech' as it happens frequently on silence
+           updateListeningState(false);
+        }
+      };
+
+      recognition.onend = () => {
+        updateListeningState(false);
+      };
+
+      // Custom property to accumulate final text if continuous was true, 
+      // but with continuous=false we just grab the result in onend or handle the specific result event.
+      // For this implementation (One command at a time):
+      recognition.onresult = (event: any) => {
+          const lastResult = event.results[event.results.length - 1];
+          if (lastResult.isFinal) {
+              const text = lastResult[0].transcript.trim();
+              if (text) {
+                  onTranscript(text);
+              }
+          }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+
+    } catch (error) {
+      console.error("Failed to start recognition:", error);
+      alert("Error al iniciar el micrófono. Intenta recargar la página.");
+      updateListeningState(false);
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      updateListeningState(false);
+    }
+  };
+
+  const toggleListening = () => {
+    if (listening) {
+      stopListening();
+    } else {
+      startListening();
+    }
   };
 
   return (
@@ -76,18 +102,23 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, isProcessi
       onClick={toggleListening}
       disabled={isProcessing}
       className={`
-        p-3 rounded-full transition-all duration-300 relative
+        p-3 rounded-full transition-all duration-300 relative shadow-lg
         ${listening 
-          ? 'bg-red-500/20 text-red-400 border border-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' 
-          : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20'
+          ? 'bg-red-500 text-white animate-pulse shadow-red-500/50' 
+          : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white border border-white/10 hover:scale-105 shadow-cyan-500/30'
         }
-        ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
+        ${isProcessing ? 'opacity-50 cursor-not-allowed bg-slate-600' : ''}
       `}
-      title={listening ? "Detener grabación" : "Iniciar grabación de voz"}
+      title={listening ? "Detener" : "Hablar con Jarvis"}
     >
-      {listening ? <MicOff size={20} /> : <Mic size={20} />}
+      {isProcessing ? (
+        <Loader2 size={20} className="animate-spin" />
+      ) : listening ? (
+        <MicOff size={20} />
+      ) : (
+        <Mic size={20} />
+      )}
       
-      {/* Visual indicator for active recording state */}
       {listening && (
         <span className="absolute -top-1 -right-1 flex h-3 w-3">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
