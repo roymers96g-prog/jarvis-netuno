@@ -1,19 +1,17 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { InstallType } from "../types";
-import { getAllPrices } from "./settingsService";
-
-// Declare process for TS to avoid build errors
-declare var process: any;
+import { getAllPrices, getEffectiveApiKey } from "./settingsService";
 
 // Initialize Gemini lazily
-let ai: GoogleGenAI | null = null;
+// We do NOT cache the instance globally anymore to ensure 
+// we pick up the new key immediately if the user updates it in settings.
 
 const getAiInstance = () => {
-  if (!ai) {
-    const apiKey = process.env.API_KEY;
-    ai = new GoogleGenAI({ apiKey: apiKey || '' });
+  const apiKey = getEffectiveApiKey();
+  if (!apiKey) {
+    throw new Error("API Key missing");
   }
-  return ai;
+  return new GoogleGenAI({ apiKey });
 };
 
 const RESPONSE_SCHEMA: Schema = {
@@ -108,16 +106,16 @@ export const processUserMessage = async (message: string, currentDate: string) =
   } catch (error) {
     console.error("Gemini Error:", error);
     if (error instanceof Error) {
-      if (error.message.includes("API key") || error.message.includes("403")) {
+      if (error.message.includes("API Key missing") || error.message.includes("403") || error.message.includes("API key")) {
          return {
           records: [],
-          jarvisResponse: "⚠️ Error: Falta la API Key."
+          jarvisResponse: "⚠️ Error: Falta la API Key. Por favor, ingrésala en Configuración."
         };
       }
     }
     return {
       records: [],
-      jarvisResponse: "Error de conexión. Intente nuevamente."
+      jarvisResponse: "Error de conexión o configuración. Verifica tu API Key en Ajustes."
     };
   }
 };

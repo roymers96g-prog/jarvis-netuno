@@ -1,8 +1,12 @@
 import { AppSettings, InstallType } from '../types';
 import { DEFAULT_PRICES, SETTINGS_STORAGE_KEY } from '../constants';
 
+// Declare process for TS
+declare var process: any;
+
 const DEFAULT_SETTINGS: AppSettings = {
   nickname: '', // Empty by default forces the user to set it
+  apiKey: '',   // Empty by default
   ttsEnabled: true,
   theme: 'dark',
   customPrices: { ...DEFAULT_PRICES },
@@ -42,4 +46,13 @@ export const getPrice = (type: InstallType): number => {
 
 export const getAllPrices = () => {
   return getSettings().customPrices;
+};
+
+// Helper to get effective key (User Setting > Environment Variable)
+export const getEffectiveApiKey = (): string => {
+  const settings = getSettings();
+  if (settings.apiKey && settings.apiKey.trim().length > 0) {
+    return settings.apiKey.trim();
+  }
+  return process.env.API_KEY || '';
 };

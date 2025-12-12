@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, InstallType } from '../types';
 import { LABELS } from '../constants';
 import { exportBackupData, importBackupData } from '../services/storageService';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play } from 'lucide-react';
-
-// Declare process for TS
-declare var process: any;
+import { getEffectiveApiKey } from '../services/settingsService';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -19,18 +17,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Check effective API Key status
   useEffect(() => {
-    const key = process.env.API_KEY;
+    const key = getEffectiveApiKey();
     if (key && key.length > 10) {
       setApiKeyStatus('ok');
     } else {
       setApiKeyStatus('missing');
     }
+  }, [localSettings.apiKey]); // Re-check when user types
 
+  useEffect(() => {
     // Load voices
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
-      // Filter primarily for Spanish, but keep others if needed
       const spanishVoices = voices.filter(v => v.lang.startsWith('es'));
       setAvailableVoices(spanishVoices.length > 0 ? spanishVoices : voices);
     };
@@ -94,9 +94,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const handleExport = () => {
     const dataStr = exportBackupData();
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
     const exportFileDefaultName = `netuno_backup_${new Date().toISOString().slice(0,10)}.json`;
-    
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
@@ -137,6 +135,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
         </h2>
         <p className="dark:text-zinc-500 text-slate-500 text-sm">Personaliza tu experiencia.</p>
       </header>
+
+      {/* System Status & API Key */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">CONEXIÓN IA</h3>
+        
+        <div className={`flex flex-col p-4 rounded-2xl border shadow-sm glass-panel transition-colors ${
+          apiKeyStatus === 'ok' ? 'border-emerald-500/20' : 'border-red-500/20'
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              {apiKeyStatus === 'ok' ? <CheckCircle className="text-emerald-500" /> : <XCircle className="text-red-500" />}
+              <div>
+                <span className={`block font-bold text-sm ${apiKeyStatus === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'}`}>IA Gemini</span>
+                <span className="text-[10px] dark:text-zinc-500 text-slate-500">{apiKeyStatus === 'ok' ? 'Conectado' : 'Sin API Key'}</span>
+              </div>
+            </div>
+            <div className={`w-2 h-2 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`} />
+          </div>
+
+          <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-3">
+            <label className="text-xs font-bold text-slate-500 dark:text-zinc-400 mb-2 block flex items-center gap-2">
+              <Key size={12} /> Google Gemini API Key
+            </label>
+            <input 
+              type="password"
+              value={localSettings.apiKey}
+              onChange={(e) => setLocalSettings(p => ({ ...p, apiKey: e.target.value }))}
+              placeholder="Pega tu llave aquí (AIzaSy...)"
+              className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-sm dark:text-white text-slate-900 pb-2 placeholder:text-slate-400 font-mono"
+            />
+            <p className="text-[10px] text-slate-400 mt-2 leading-tight">
+              Si tienes problemas de conexión, pega tu API Key aquí manualmente. Se guardará de forma segura en tu dispositivo.
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* Profile Section */}
       <section className="space-y-3">
@@ -228,23 +262,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
                 </button>
              </div>
            )}
-        </div>
-      </section>
-
-      {/* System Status */}
-      <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">SISTEMA</h3>
-        <div className={`flex items-center justify-between p-4 rounded-2xl border shadow-sm glass-panel ${
-          apiKeyStatus === 'ok' ? 'border-emerald-500/20' : 'border-red-500/20'
-        }`}>
-          <div className="flex items-center gap-3">
-            {apiKeyStatus === 'ok' ? <CheckCircle className="text-emerald-500" /> : <XCircle className="text-red-500" />}
-            <div>
-              <span className={`block font-bold text-sm ${apiKeyStatus === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'}`}>IA Gemini</span>
-              <span className="text-[10px] dark:text-zinc-500 text-slate-500">{apiKeyStatus === 'ok' ? 'Conectado' : 'Sin API Key'}</span>
-            </div>
-          </div>
-          <div className={`w-2 h-2 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500' : 'bg-red-500'}`} />
         </div>
       </section>
 

@@ -44,6 +44,7 @@ export interface VoiceSettings {
 
 export interface AppSettings {
   nickname: string;
+  apiKey: string; // Manual API Key override
   ttsEnabled: boolean;
   theme: 'dark' | 'light';
   customPrices: {
