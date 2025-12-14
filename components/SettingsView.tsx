@@ -316,6 +316,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
                     />
                   </div>
                   <div className="space-y-1">
+                    {/* Fix: Access `rate` via `voiceSettings` object. */}
                     <label className="text-xs font-bold text-slate-500 dark:text-zinc-400">Velocidad: {localSettings.voiceSettings.rate}</label>
                     <input 
                       type="range" min="0.5" max="2" step="0.1"

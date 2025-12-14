@@ -1,4 +1,4 @@
-import { InstallationRecord, InstallType } from '../types';
+import { ProductionRecord, InstallType } from '../types';
 import { APP_STORAGE_KEY } from '../constants';
 import { getPrice } from './settingsService';
 import { supabase } from './supabaseClient';
@@ -9,25 +9,24 @@ const getUserId = async (): Promise<string | undefined> => {
 };
 
 
-export const getRecords = async (): Promise<InstallationRecord[]> => {
+export const getRecords = async (): Promise<ProductionRecord[]> => {
   try {
     const userId = await getUserId();
-    // If offline or no user, fall back to local cache
     if (!navigator.onLine || !userId) {
       console.warn("Offline or no user, using local cache.");
       const data = localStorage.getItem(APP_STORAGE_KEY);
       return data ? JSON.parse(data) : [];
     }
     
-    // Fetch from Supabase
     const { data, error } = await supabase
-      .from('records')
+      .from('production_records')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .order('record_date', { ascending: false })
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    // Update local cache with fresh data
     localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(data));
     return data || [];
 
@@ -38,85 +37,95 @@ export const getRecords = async (): Promise<InstallationRecord[]> => {
   }
 };
 
-export const saveRecord = async (type: InstallType, quantity: number, dateOverride?: string): Promise<InstallationRecord[]> => {
-  let dateObj: Date;
-  if (dateOverride) {
-    dateObj = dateOverride.includes('T') ? new Date(dateOverride) : new Date(`${dateOverride}T12:00:00`);
-  } else {
-    dateObj = new Date();
-  }
+export const saveRecord = async (
+    type: InstallType, 
+    quantity: number | null, 
+    dateOverride?: string,
+    description?: string | null,
+    manual_amount?: number | null
+): Promise<ProductionRecord[]> => {
+    const userId = await getUserId();
+    if (!navigator.onLine || !userId) {
+       alert("Modo sin conexión. El registro se guardará localmente y se sincronizará más tarde.");
+       // Offline logic would be more complex, for now we just prevent crash
+       return getRecords();
+    }
 
-  const dateIsoString = dateObj.toISOString();
-  const unitPrice = getPrice(type);
-  const userId = await getUserId();
-
-  const newRecords: Omit<InstallationRecord, 'id' | 'timestamp'>[] = [];
-  for (let i = 0; i < quantity; i++) {
-    newRecords.push({
-      user_id: userId,
-      type,
-      date: dateIsoString,
-      amount: unitPrice,
+    const record_date = dateOverride 
+        ? new Date(dateOverride).toISOString().split('T')[0] 
+        : new Date().toISOString().split('T')[0];
+    
+    const { error } = await supabase.rpc('insert_production_record', {
+        p_user_id: userId,
+        p_installation_type: type,
+        p_quantity: quantity,
+        p_record_date: record_date,
+        p_notes: null,
+        p_description: description,
+        p_manual_amount: manual_amount
     });
-  }
 
-  // Optimistic UI update: add to local storage first
-  const currentRecords = await getRecords();
-  const tempRecords: InstallationRecord[] = newRecords.map((r, i) => ({
-    ...r,
-    id: `temp-${crypto.randomUUID()}`,
-    timestamp: dateObj.getTime() + i
-  }));
-  const updated = [...currentRecords, ...tempRecords];
-  localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(updated));
+    if (error) {
+        console.error("Supabase RPC save failed:", error);
+        alert(`Error al guardar: ${error.message}`);
+        throw error;
+    }
 
-  // Then try to save to Supabase
-  if (navigator.onLine && userId) {
-     const { error } = await supabase.from('records').insert(newRecords);
-     if (error) {
-       console.error("Supabase save failed:", error);
-       // Here you could implement a more robust offline queue
-       return updated; // Return optimistic update
-     }
-     // Re-fetch from server to get real IDs and confirm
-     return await getRecords();
-  }
-  
-  return updated; // Return optimistic update if offline
+    return await getRecords();
 };
 
-export const deleteRecord = async (id: string): Promise<InstallationRecord[]> => {
-  // Optimistic UI update
+export const updateRecordQuantity = async (recordId: string, newQuantity: number): Promise<ProductionRecord[]> => {
+    const userId = await getUserId();
+    if (!navigator.onLine || !userId) {
+       alert("Modo sin conexión. No se pueden realizar correcciones.");
+       return getRecords();
+    }
+
+    const records = await getRecords();
+    const recordToUpdate = records.find(r => r.id === recordId);
+
+    if (!recordToUpdate || recordToUpdate.installation_type === InstallType.SERVICE) {
+        console.error("Cannot update service record quantity or record not found.");
+        return records;
+    }
+
+    const newTotalAmount = newQuantity * (recordToUpdate.unit_price || 0);
+
+    const { error } = await supabase
+        .from('production_records')
+        .update({ quantity: newQuantity, total_amount: newTotalAmount })
+        .match({ id: recordId, user_id: userId });
+
+    if (error) {
+        console.error("Supabase update failed:", error);
+        alert(`Error al corregir: ${error.message}`);
+        throw error;
+    }
+    return await getRecords();
+};
+
+
+export const deleteRecord = async (id: string): Promise<ProductionRecord[]> => {
   const currentRecords = await getRecords();
   const updated = currentRecords.filter(r => r.id !== id);
   localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(updated));
   
   const userId = await getUserId();
-  // If record was temporary, no need to call DB
-  if (id.startsWith('temp-')) {
-    return updated;
-  }
 
-  // Then try to delete from Supabase
   if (navigator.onLine && userId) {
     const { error } = await supabase
-      .from('records')
+      .from('production_records')
       .delete()
       .match({ id: id, user_id: userId });
 
     if (error) {
       console.error("Supabase delete failed:", error);
-      // Revert local state if DB call fails
       localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(currentRecords));
       return currentRecords;
     }
   }
 
   return updated;
-};
-
-export const clearAllData = () => {
-  localStorage.removeItem(APP_STORAGE_KEY);
 };
 
 // Backup Functions (These remain local for user-controlled backups)
@@ -129,8 +138,8 @@ export const importBackupData = (jsonString: string): boolean => {
   try {
     const parsed = JSON.parse(jsonString);
     if (Array.isArray(parsed)) {
-      // Here you would ideally upload this to supabase
-      // For now, it just overwrites local
+      // This is a destructive action and should be used with caution
+      // It overwrites local cache. A proper implementation would merge/upload to Supabase.
       localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(parsed));
       console.warn("Backup imported locally. Sync with Supabase on next connection.");
       return true;
