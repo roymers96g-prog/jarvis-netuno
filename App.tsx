@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRecords, saveRecord, deleteRecord } from './services/storageService';
-import { processLoggingMessage, processQueryMessage, resetChat } from './services/geminiService';
+import { processUserMessage, resetChat } from './services/geminiService';
 import { getSettings, saveSettings } from './services/settingsService';
+import { supabase } from './services/supabaseClient';
+import { Session } from '@supabase/supabase-js';
+
+// Components
 import { Dashboard } from './components/Dashboard';
 import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
@@ -12,12 +16,18 @@ import { ConfirmationModal } from './components/ConfirmationModal';
 import { NicknameModal } from './components/NicknameModal';
 import { WelcomeTutorial } from './components/WelcomeTutorial';
 import { InstallModal } from './components/InstallModal';
+import { AuthView } from './components/AuthView';
+
+// Types & Constants
 import { InstallationRecord, ChatMessage, ExtractedData, InstallType, AppSettings } from './types';
 import { LABELS } from './constants';
 import { Send, Menu, X, Aperture, LayoutGrid, LayoutDashboard, List, Settings as SettingsIcon, Download, Share, Save } from 'lucide-react';
 
 const App: React.FC = () => {
-  // State
+  // Auth State
+  const [session, setSession] = useState<Session | null>(null);
+
+  // App State
   const [records, setRecords] = useState<InstallationRecord[]>([]);
   const [settings, setSettings] = useState<AppSettings>(getSettings());
   
@@ -51,9 +61,29 @@ const App: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const speakingRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Initialize Data & PWA check
+  // Authentication Effect
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      // When user logs out, clear records to avoid showing previous user's data
+      if (!session) {
+        setRecords([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Initialize Data, PWA check & Real-time Subscription
+  useEffect(() => {
+    if (!session) return; // Don't run if not logged in
+
     const initData = async () => {
+      setIsLoadingData(true);
       try {
         const data = await getRecords();
         setRecords(data);
@@ -66,56 +96,43 @@ const App: React.FC = () => {
     
     initData();
     
-    // Check Tutorial Status
     const hasSeenTutorial = localStorage.getItem('hasSeenTutorial');
-    if (!hasSeenTutorial) {
-      setShowTutorial(true);
-    }
+    if (!hasSeenTutorial) setShowTutorial(true);
+    if (!settings.nickname) setIsNicknameModalOpen(true);
 
-    // Check Nickname Status
-    if (!settings.nickname) {
-       setIsNicknameModalOpen(true);
-    }
+    if (settings.theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
 
-    // Apply Theme
-    if (settings.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    setMessages([{ id: 'init', sender: 'jarvis', text: 'Sistema en línea. Esperando informe de producción.' }]);
 
-    // Initial Greeting
-    setMessages([{
-      id: 'init',
-      sender: 'jarvis',
-      text: 'Sistema en línea. Esperando informe de producción.'
-    }]);
-
-    // Check for iOS
     const isIosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(isIosDevice);
 
-    // Capture install prompt
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      console.log("Install prompt captured");
     };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    
+    // Real-time Subscription
+    const channel = supabase
+      .channel('public:records')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'records' }, (payload) => {
+        console.log('Real-time change received!', payload);
+        initData(); // Re-fetch all data on any change
+      })
+      .subscribe();
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [session]); // Re-run all this when session changes
 
   // Update theme when settings change
   useEffect(() => {
-    if (settings.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (settings.theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   }, [settings.theme]);
 
   // Scroll to bottom of chat
@@ -126,9 +143,7 @@ const App: React.FC = () => {
   const triggerSuccessEffect = () => {
     setShowSuccessFlash(true);
     triggerBackupIndicator();
-    setTimeout(() => {
-      setShowSuccessFlash(false);
-    }, 600); 
+    setTimeout(() => setShowSuccessFlash(false), 600); 
   };
 
   const triggerBackupIndicator = () => {
@@ -140,41 +155,25 @@ const App: React.FC = () => {
   const speakText = (text: string) => {
     if (settings.ttsEnabled && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'es-ES';
       utterance.pitch = settings.voiceSettings.pitch;
       utterance.rate = settings.voiceSettings.rate;
-
       const voices = window.speechSynthesis.getVoices();
       if (settings.voiceSettings.voiceURI) {
         const selected = voices.find(v => v.voiceURI === settings.voiceSettings.voiceURI);
         if (selected) utterance.voice = selected;
-      } else {
-        const jarvisCandidates = ['Google español de Estados Unidos', 'Microsoft Pablo', 'Microsoft Raul', 'Jorge', 'Juan'];
-        const bestVoice = voices.find(v => jarvisCandidates.some(c => v.name.includes(c)));
-        if (bestVoice) {
-          utterance.voice = bestVoice;
-        } else {
-          const fallback = voices.find(v => v.lang === 'es-US' || v.lang === 'es-MX') || voices.find(v => v.lang.includes('es'));
-          if (fallback) utterance.voice = fallback;
-        }
       }
-
       utterance.onstart = () => setIsJarvisSpeaking(true);
       utterance.onend = () => setIsJarvisSpeaking(false);
       utterance.onerror = () => setIsJarvisSpeaking(false);
-      
       speakingRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     }
   };
 
   const handleUpdateSettings = (newSettings: AppSettings) => {
-    // If API key changed, reset the chat session to use the new key
-    if (settings.apiKey !== newSettings.apiKey) {
-        resetChat();
-    }
+    if (settings.apiKey !== newSettings.apiKey) resetChat();
     setSettings(newSettings);
     saveSettings(newSettings);
   };
@@ -195,78 +194,49 @@ const App: React.FC = () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
+      if (outcome === 'accepted') setDeferredPrompt(null);
     } else {
       setIsInstallModalOpen(true);
     }
     setIsMenuOpen(false);
   };
 
-  // ASYNC: Handle Quick Add via Widget
   const handleQuickAdd = async (type: InstallType) => {
     const newRecordsList = await saveRecord(type, 1);
-    setRecords(newRecordsList);
+    setRecords(newRecordsList); // Optimistic update
     triggerSuccessEffect();
-    
     const responseText = `Registro completado.`;
-    const confirmMsg: ChatMessage = {
-      id: Date.now().toString(),
-      sender: 'jarvis',
-      text: responseText
-    };
-    setMessages(prev => [...prev, confirmMsg]);
+    setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'jarvis', text: responseText }]);
     setIsWidgetOpen(false);
     speakText(responseText);
   };
 
-  // ASYNC: Handle User Input
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
 
-    const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'user', text }]);
     setInputValue('');
     setIsProcessing(true);
 
-    // Client-side intent detection
-    const queryKeywords = ['cuánto', 'cuanto', 'cómo voy', 'como voy', 'total', 'resumen', 'llevo', 'ganancias'];
-    const isQuery = queryKeywords.some(keyword => text.toLowerCase().includes(keyword));
+    const result: ExtractedData = await processUserMessage(text, records);
 
-    let result: ExtractedData;
-
-    if (isQuery) {
-        result = await processQueryMessage(text, records);
-    } else {
-        result = await processLoggingMessage(text);
-    }
-
-    if (result.records && result.records.length > 0) {
+    if (result.intent === 'LOGGING' && result.records?.length > 0) {
       let currentList = [...records];
       for (const rec of result.records) {
          currentList = await saveRecord(rec.type as any, rec.quantity, rec.date);
       }
-      setRecords(currentList); 
+      setRecords(currentList); // Optimistic update
       triggerSuccessEffect();
     }
 
-    const jarvisMsg: ChatMessage = { 
-      id: (Date.now() + 1).toString(), 
-      sender: 'jarvis', 
-      text: result.jarvisResponse 
-    };
-    
+    const jarvisMsg: ChatMessage = { id: (Date.now() + 1).toString(), sender: 'jarvis', text: result.jarvisResponse };
     setMessages(prev => [...prev, jarvisMsg]);
     setIsProcessing(false);
     speakText(result.jarvisResponse);
   };
 
-  const handleRequestDelete = (id: string) => {
-    setRecordToDelete(id);
-  };
+  const handleRequestDelete = (id: string) => setRecordToDelete(id);
 
-  // ASYNC: Confirm Delete
   const confirmDelete = async () => {
     if (recordToDelete) {
       const updated = await deleteRecord(recordToDelete);
@@ -284,16 +254,17 @@ const App: React.FC = () => {
   const getDeleteModalTitle = () => {
     if (!recordToDelete) return 'ELIMINAR';
     const rec = records.find(r => r.id === recordToDelete);
-    if (rec && LABELS[rec.type]) {
-      return `ELIMINAR ${LABELS[rec.type].toUpperCase()}`;
-    }
+    if (rec && LABELS[rec.type]) return `ELIMINAR ${LABELS[rec.type].toUpperCase()}`;
     return 'ELIMINAR REGISTRO';
   };
+
+  if (!session) {
+    return <AuthView />;
+  }
 
   return (
     <div className="min-h-screen dark:bg-zinc-950 bg-slate-100 dark:text-zinc-100 text-slate-800 font-rajdhani relative overflow-hidden transition-colors duration-500">
       
-      {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent h-[10%] w-full animate-scanline z-0 pointer-events-none" />
         <div className="dark:hidden absolute top-0 left-0 w-full h-full bg-gradient-to-b from-blue-50 to-slate-100" />
@@ -302,7 +273,6 @@ const App: React.FC = () => {
         <div className="hidden dark:block absolute top-[-10%] left-[-10%] w-[400px] h-[400px] bg-zinc-800/20 rounded-full blur-[80px]" />
       </div>
 
-      {/* SUCCESS FLASH OVERLAY */}
       {showSuccessFlash && (
         <div className="fixed inset-0 z-[100] pointer-events-none animate-flash">
            <div className="absolute inset-0 border-[4px] border-emerald-500/50 dark:border-cyan-500/30 rounded-lg box-border shadow-[inset_0_0_50px_rgba(16,185,129,0.3)]"></div>
@@ -313,20 +283,17 @@ const App: React.FC = () => {
       <VoiceVisualizer isActive={isJarvisSpeaking} mode="jarvis" />
       <VoiceVisualizer isActive={isUserSpeaking} mode="user" />
 
-      {/* BACKUP INDICATOR TOAST */}
       <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[80] transition-all duration-500 ${showBackupIndicator ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
          <div className="bg-emerald-500/90 dark:bg-emerald-900/90 text-white dark:text-emerald-100 px-4 py-2 rounded-full text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 border border-white/10 backdrop-blur-md">
             <Save size={14} className="animate-pulse" />
-            COPIA DE SEGURIDAD AUTO
+            DATOS SINCRONIZADOS
          </div>
       </div>
 
-      {/* MODALS */}
       <InstallModal isOpen={isInstallModalOpen} onClose={() => setIsInstallModalOpen(false)} isIOS={isIOS} />
       <NicknameModal isOpen={isNicknameModalOpen} onSave={handleSaveNickname} />
       {showTutorial && !isNicknameModalOpen && <WelcomeTutorial onComplete={handleTutorialComplete} username={settings.nickname} />}
 
-      {/* Header */}
       <nav className="fixed top-0 w-full glass-panel z-50 h-20 flex items-center justify-between px-4 transition-all border-b border-white/10 shadow-sm backdrop-blur-xl">
         <div className="flex items-center gap-3" onClick={() => navigateTo('dashboard')}>
           <div className="relative">
@@ -335,7 +302,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold tracking-[0.2em] leading-none dark:text-zinc-100 text-slate-900">NETUNO</h1>
-            <span className="text-[10px] text-cyan-600 dark:text-cyan-500 font-mono tracking-widest font-bold">JARVIS SYSTEM v7.2</span>
+            <span className="text-[10px] text-cyan-600 dark:text-cyan-500 font-mono tracking-widest font-bold">JARVIS SYSTEM v8.0</span>
           </div>
         </div>
         
@@ -349,7 +316,6 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      {/* Navigation Menu */}
       {isMenuOpen && (
         <div className="fixed top-20 right-0 w-64 glass-panel border-l border-b rounded-bl-3xl z-[60] shadow-2xl animate-fadeIn p-4 h-[calc(100vh-5rem)]">
            <div className="flex flex-col gap-3">
@@ -375,7 +341,6 @@ const App: React.FC = () => {
       <QuickWidget isOpen={isWidgetOpen} onClose={() => setIsWidgetOpen(false)} onQuickAdd={handleQuickAdd} prices={settings.customPrices} />
       <ConfirmationModal isOpen={!!recordToDelete} onClose={() => setRecordToDelete(null)} onConfirm={confirmDelete} title={getDeleteModalTitle()} message="¿Eliminar este registro permanentemente?" />
 
-      {/* Main Content Area */}
       <main className="pt-28 px-4 pb-48 max-w-2xl mx-auto z-10 relative min-h-screen">
         {isLoadingData ? (
            <div className="flex flex-col items-center justify-center py-20 opacity-50">
@@ -391,7 +356,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Sticky Chat Interface */}
       <div className={`fixed bottom-0 w-full z-40 glass-panel border-t transition-transform duration-300 ${currentView === 'settings' ? 'translate-y-full' : 'translate-y-0'}`}>
         <div className="max-w-2xl mx-auto">
           <div className="max-h-64 overflow-y-auto px-4 pt-4 pb-2 space-y-3">

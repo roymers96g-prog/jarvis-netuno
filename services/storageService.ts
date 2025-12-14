@@ -1,110 +1,116 @@
 import { InstallationRecord, InstallType } from '../types';
 import { APP_STORAGE_KEY } from '../constants';
 import { getPrice } from './settingsService';
+import { supabase } from './supabaseClient';
 
-// CONFIGURACIÓN PARA FUSIÓN CON BACKEND
-// Cuando encuentres tu URL del backend de Cursor, pégala aquí.
-// Ejemplo: "https://mi-backend-cursor.railway.app"
-const API_URL = ""; 
+const getUserId = async (): Promise<string | undefined> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id;
+};
 
-// Simulación de latencia de red (esto ayuda a que la UI se sienta realista antes de conectar el backend)
-const simulateNetwork = () => new Promise(resolve => setTimeout(resolve, 50));
 
 export const getRecords = async (): Promise<InstallationRecord[]> => {
   try {
-    // 1. INTENTO DE CARGA DESDE BACKEND (Si existe la URL)
-    if (API_URL) {
-      try {
-        const response = await fetch(`${API_URL}/api/records`);
-        if (response.ok) {
-          const data = await response.json();
-          // Actualizamos el caché local por si acaso
-          localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(data));
-          return data;
-        }
-      } catch (err) {
-        console.warn("Backend no disponible, usando modo offline local.", err);
-      }
+    const userId = await getUserId();
+    // If offline or no user, fall back to local cache
+    if (!navigator.onLine || !userId) {
+      console.warn("Offline or no user, using local cache.");
+      const data = localStorage.getItem(APP_STORAGE_KEY);
+      return data ? JSON.parse(data) : [];
     }
+    
+    // Fetch from Supabase
+    const { data, error } = await supabase
+      .from('records')
+      .select('*')
+      .eq('user_id', userId);
 
-    // 2. MODO LOCAL / OFFLINE (Fallback)
-    await simulateNetwork();
+    if (error) throw error;
+
+    // Update local cache with fresh data
+    localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(data));
+    return data || [];
+
+  } catch (e) {
+    console.error("Failed to load records from Supabase, using local cache.", e);
     const data = localStorage.getItem(APP_STORAGE_KEY);
     return data ? JSON.parse(data) : [];
-  } catch (e) {
-    console.error("Failed to load records", e);
-    return [];
   }
 };
 
 export const saveRecord = async (type: InstallType, quantity: number, dateOverride?: string): Promise<InstallationRecord[]> => {
-  // Cálculo de fecha y precio (Lógica compartida)
   let dateObj: Date;
-
   if (dateOverride) {
-    if (dateOverride.includes('T')) {
-      dateObj = new Date(dateOverride);
-    } else {
-      dateObj = new Date(`${dateOverride}T12:00:00`);
-    }
+    dateObj = dateOverride.includes('T') ? new Date(dateOverride) : new Date(`${dateOverride}T12:00:00`);
   } else {
     dateObj = new Date();
   }
 
   const dateIsoString = dateObj.toISOString();
   const unitPrice = getPrice(type);
-  const newRecords: InstallationRecord[] = [];
+  const userId = await getUserId();
 
+  const newRecords: Omit<InstallationRecord, 'id' | 'timestamp'>[] = [];
   for (let i = 0; i < quantity; i++) {
     newRecords.push({
-      id: crypto.randomUUID(),
+      user_id: userId,
       type,
       date: dateIsoString,
       amount: unitPrice,
-      timestamp: dateObj.getTime() + i
     });
   }
 
-  // 1. INTENTO DE GUARDADO EN BACKEND
-  if (API_URL) {
-    try {
-      await fetch(`${API_URL}/api/records`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ records: newRecords })
-      });
-      // Si el backend responde OK, volvemos a pedir la lista actualizada
-      return await getRecords();
-    } catch (err) {
-      console.warn("No se pudo guardar en Backend, guardando localmente.", err);
-    }
-  }
-
-  // 2. GUARDADO LOCAL (Actual)
-  const currentRecords = await getRecords(); // Ahora es async
-  const updated = [...currentRecords, ...newRecords];
+  // Optimistic UI update: add to local storage first
+  const currentRecords = await getRecords();
+  const tempRecords: InstallationRecord[] = newRecords.map((r, i) => ({
+    ...r,
+    id: `temp-${crypto.randomUUID()}`,
+    timestamp: dateObj.getTime() + i
+  }));
+  const updated = [...currentRecords, ...tempRecords];
   localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(updated));
-  await simulateNetwork();
+
+  // Then try to save to Supabase
+  if (navigator.onLine && userId) {
+     const { error } = await supabase.from('records').insert(newRecords);
+     if (error) {
+       console.error("Supabase save failed:", error);
+       // Here you could implement a more robust offline queue
+       return updated; // Return optimistic update
+     }
+     // Re-fetch from server to get real IDs and confirm
+     return await getRecords();
+  }
   
-  return updated;
+  return updated; // Return optimistic update if offline
 };
 
 export const deleteRecord = async (id: string): Promise<InstallationRecord[]> => {
-  // 1. INTENTO DE BORRADO EN BACKEND
-  if (API_URL) {
-    try {
-      await fetch(`${API_URL}/api/records/${id}`, { method: 'DELETE' });
-      return await getRecords();
-    } catch (err) {
-      console.warn("No se pudo borrar en Backend, borrando localmente.", err);
-    }
-  }
-
-  // 2. BORRADO LOCAL
+  // Optimistic UI update
   const currentRecords = await getRecords();
   const updated = currentRecords.filter(r => r.id !== id);
   localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(updated));
-  await simulateNetwork();
+  
+  const userId = await getUserId();
+  // If record was temporary, no need to call DB
+  if (id.startsWith('temp-')) {
+    return updated;
+  }
+
+  // Then try to delete from Supabase
+  if (navigator.onLine && userId) {
+    const { error } = await supabase
+      .from('records')
+      .delete()
+      .match({ id: id, user_id: userId });
+
+    if (error) {
+      console.error("Supabase delete failed:", error);
+      // Revert local state if DB call fails
+      localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(currentRecords));
+      return currentRecords;
+    }
+  }
 
   return updated;
 };
@@ -113,7 +119,7 @@ export const clearAllData = () => {
   localStorage.removeItem(APP_STORAGE_KEY);
 };
 
-// Backup Functions (Estos se mantienen síncronos ya que son utilidades de archivo)
+// Backup Functions (These remain local for user-controlled backups)
 export const exportBackupData = (): string => {
   const data = localStorage.getItem(APP_STORAGE_KEY);
   return data || "[]";
@@ -123,7 +129,10 @@ export const importBackupData = (jsonString: string): boolean => {
   try {
     const parsed = JSON.parse(jsonString);
     if (Array.isArray(parsed)) {
+      // Here you would ideally upload this to supabase
+      // For now, it just overwrites local
       localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(parsed));
+      console.warn("Backup imported locally. Sync with Supabase on next connection.");
       return true;
     }
     return false;

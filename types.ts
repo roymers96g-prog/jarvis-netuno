@@ -7,6 +7,7 @@ export enum InstallType {
 
 export interface InstallationRecord {
   id: string;
+  user_id?: string; // Foreign key to auth.users
   type: InstallType;
   date: string; // ISO String
   amount: number;
@@ -29,6 +30,7 @@ export interface ProductionStats {
 
 // Gemini Response Schema Structure
 export interface ExtractedData {
+  intent: 'LOGGING' | 'QUERY' | 'GENERAL_CHAT';
   records: Array<{
     type: string; // Will map to InstallType
     quantity: number;

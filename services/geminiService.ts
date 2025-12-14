@@ -18,8 +18,14 @@ const getAiInstance = (): GoogleGenAI => {
 const RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
+    intent: {
+      type: Type.STRING,
+      enum: ['LOGGING', 'QUERY', 'GENERAL_CHAT'],
+      description: "La intención del usuario: LOGGING para registrar datos, QUERY para hacer una pregunta sobre los datos, o GENERAL_CHAT para una conversación casual."
+    },
     records: {
       type: Type.ARRAY,
+      description: "Lista de registros a guardar. Vacío si la intención no es LOGGING.",
       items: {
         type: Type.OBJECT,
         properties: {
@@ -42,10 +48,10 @@ const RESPONSE_SCHEMA: Schema = {
     },
     jarvisResponse: {
       type: Type.STRING,
-      description: "Respuesta de Jarvis. SIEMPRE menciona qué se guardó y PARA QUÉ FECHA se guardó."
+      description: "Respuesta de Jarvis para mostrar al usuario. SIEMPRE debe contener una respuesta."
     }
   },
-  required: ["records", "jarvisResponse"]
+  required: ["intent", "records", "jarvisResponse"]
 };
 
 const getSystemInstruction = () => {
@@ -53,16 +59,16 @@ const getSystemInstruction = () => {
     return `
       Fecha y Hora Actual del Sistema: ${new Date().toLocaleString('es-ES')}
       
-      Eres Jarvis, un asistente de IA para Netuno. Eres eficiente, directo y nunca haces preguntas. Tu única función es extraer datos de registro.
+      Eres Jarvis, un asistente de IA para Netuno. Eres eficiente y directo. Tu función es ayudar al usuario a registrar su producción y responder preguntas sobre ella basándote en el contexto que se te proporciona en cada mensaje.
       
-      MODO DE REGISTRO:
-      1. Extraer instalaciones (Residencial, Corporativa, Poste, Servicio Técnico) y su cantidad.
-      2. Determinar la fecha exacta del registro. Si no se especifica, usa la fecha actual. Si se dice "ayer", resta 1 día.
-      3. Mantén el contexto de la conversación. Si el usuario dice "agrega 2 más", debe ser del último tipo mencionado.
-      4. Responde SIEMPRE con el JSON schema.
-      5. En 'jarvisResponse', sé conciso. Confirma la acción y la fecha. Ejemplo: "Entendido. 2 Residenciales registradas para ayer."
+      TAREAS PRINCIPALES:
+      1.  Determina la intención del usuario: LOGGING (registrar datos), QUERY (preguntar sobre datos), o GENERAL_CHAT (saludo, etc.).
+      2.  Si es LOGGING: Extrae instalaciones (Residencial, Corporativa, Poste, Servicio Técnico), cantidad y fecha. Si no hay fecha, usa la actual. Si dice "ayer", resta 1 día. Mantén el contexto de la conversación (ej: "agrega 2 más" se refiere al último tipo). En 'jarvisResponse', confirma la acción y la fecha.
+      3.  Si es QUERY: Usa los "DATOS DE CONTEXTO" que se te proporcionan en el mensaje del usuario para responder de forma concisa. NO inventes datos.
+      4.  Si es GENERAL_CHAT: Responde de forma breve y profesional.
+      5.  Responde SIEMPRE con el JSON schema. 'records' puede ser un array vacío si la intención no es LOGGING.
       
-      Valores Configurados:
+      Precios de Referencia:
       - Residential: $${prices[InstallType.RESIDENTIAL]}
       - Corporate: $${prices[InstallType.CORPORATE]}
       - Poste: $${prices[InstallType.POSTE]}
@@ -108,9 +114,10 @@ export const validateApiKey = async (apiKey: string): Promise<boolean> => {
   }
 };
 
-export const processLoggingMessage = async (message: string): Promise<ExtractedData> => {
+export const processUserMessage = async (message: string, records: InstallationRecord[]): Promise<ExtractedData> => {
   if (!navigator.onLine) {
     return {
+      intent: 'GENERAL_CHAT',
       records: [],
       jarvisResponse: "⚠️ Modo Sin Conexión. La IA no está disponible. Usa el menú de acceso rápido para registrar manualmente."
     };
@@ -124,90 +131,63 @@ export const processLoggingMessage = async (message: string): Promise<ExtractedD
         throw new Error("Chat not initialized. Check API Key.");
     }
 
-    const response = await chat.sendMessage({ message });
+    // Create data summary for context
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-CA');
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let monthTotal = 0;
+    let todayTotal = 0;
+    let allTotal = 0;
+
+    records.forEach(r => {
+        const rDate = new Date(r.date);
+        const rDateStr = rDate.toLocaleDateString('en-CA');
+        const isThisMonth = rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
+        const isToday = rDateStr === todayStr;
+
+        allTotal += r.amount;
+        if (isThisMonth) monthTotal += r.amount;
+        if (isToday) todayTotal += r.amount;
+    });
+    
+    const dataSummary = `
+    - Ganancias de hoy: $${todayTotal.toFixed(2)}
+    - Ganancias de este mes: $${monthTotal.toFixed(2)}
+    - Ganancias totales del año: $${allTotal.toFixed(2)}
+    - Total de actividades registradas: ${records.length}
+    `;
+
+    const promptForGemini = `
+        DATOS DE CONTEXTO (SOLO PARA RESPONDER PREGUNTAS):
+        ${dataSummary}
+
+        MENSAJE DEL USUARIO:
+        "${message}"
+    `;
+
+    const response = await chat.sendMessage({ message: promptForGemini });
     const text = response.text;
     if (!text) throw new Error("No response from AI");
 
     return JSON.parse(text);
 
   } catch (error) {
-    console.error("Gemini Logging Error:", error);
+    console.error("Gemini User Message Error:", error);
     if (error instanceof Error) {
       if (error.message.includes("API Key missing") || error.message.includes("403") || error.message.includes("API key")) {
          return {
+          intent: 'GENERAL_CHAT',
           records: [],
           jarvisResponse: "⚠️ Error: Falta la API Key o es inválida. Verifica en Configuración."
         };
       }
     }
     return {
+      intent: 'GENERAL_CHAT',
       records: [],
       jarvisResponse: "Error de conexión con IA. Verifica tu internet y tu API Key."
     };
   }
-};
-
-export const processQueryMessage = async (message: string, records: InstallationRecord[]): Promise<ExtractedData> => {
-    if (!navigator.onLine) {
-        return {
-            records: [],
-            jarvisResponse: "⚠️ Modo Sin Conexión. No se pueden realizar consultas."
-        };
-    }
-
-    try {
-        const now = new Date();
-        const todayStr = now.toLocaleDateString('en-CA');
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-
-        let monthTotal = 0;
-        let todayTotal = 0;
-        let allTotal = 0;
-
-        records.forEach(r => {
-            const rDate = new Date(r.date);
-            const rDateStr = rDate.toLocaleDateString('en-CA');
-            const isThisMonth = rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
-            const isToday = rDateStr === todayStr;
-
-            allTotal += r.amount;
-            if (isThisMonth) monthTotal += r.amount;
-            if (isToday) todayTotal += r.amount;
-        });
-        
-        const dataSummary = `
-        - Ganancias de hoy: $${todayTotal.toFixed(2)}
-        - Ganancias de este mes: $${monthTotal.toFixed(2)}
-        - Ganancias totales del año: $${allTotal.toFixed(2)}
-        - Total de actividades registradas: ${records.length}
-        `;
-
-        const prompt = `
-            Eres Jarvis. Responde la pregunta del usuario de forma concisa, directa y en español, usando los datos proporcionados. No saludes ni uses texto de relleno. Sé un asistente eficiente.
-
-            Datos de Producción:
-            ${dataSummary}
-
-            Pregunta del Usuario: "${message}"
-        `;
-        
-        const aiInstance = getAiInstance();
-        const response = await aiInstance.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-        });
-
-        const text = response.text;
-        if (!text) throw new Error("No response from AI for query");
-        
-        return { records: [], jarvisResponse: text };
-
-    } catch (error) {
-        console.error("Gemini Query Error:", error);
-        return {
-            records: [],
-            jarvisResponse: "Error al procesar la consulta. Intenta de nuevo."
-        };
-    }
 };
