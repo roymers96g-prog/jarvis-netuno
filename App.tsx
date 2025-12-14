@@ -1,20 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getRecords, saveRecord, deleteRecord } from './services/storageService';
+import { getRecords, saveRecord, deleteRecord, checkBackendStatus } from './services/storageService';
 import { processUserMessage, resetChat } from './services/geminiService';
 import { getSettings, saveSettings } from './services/settingsService';
 import { Dashboard } from './components/Dashboard';
 import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
-import { VoiceInput } from './components/VoiceInput';
+import { AnalysisView } from './components/AnalysisView';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { QuickWidget } from './components/QuickWidget';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { NicknameModal } from './components/NicknameModal';
 import { WelcomeTutorial } from './components/WelcomeTutorial';
 import { InstallModal } from './components/InstallModal';
+import { ChatBar } from './components/ChatBar';
 import { InstallationRecord, ChatMessage, ExtractedData, InstallType, AppSettings } from './types';
 import { LABELS } from './constants';
-import { Send, Menu, X, Aperture, LayoutGrid, LayoutDashboard, List, Settings as SettingsIcon, Download, Share, Save } from 'lucide-react';
+import { Menu, X, Aperture, LayoutGrid, LayoutDashboard, List, Settings as SettingsIcon, Download, Share, Save, BarChart3, ChevronDown, Bot } from 'lucide-react';
 
 const App: React.FC = () => {
   // State
@@ -24,7 +25,7 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'history' | 'settings'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'history' | 'analysis' | 'settings'>('dashboard');
   
   // Visual Effects State
   const [showSuccessFlash, setShowSuccessFlash] = useState(false);
@@ -32,7 +33,8 @@ const App: React.FC = () => {
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [showBackupIndicator, setShowBackupIndicator] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected' | 'disabled'>('checking');
+
   // Tutorial State
   const [showTutorial, setShowTutorial] = useState(false);
   const [isNicknameModalOpen, setIsNicknameModalOpen] = useState(false);
@@ -44,8 +46,8 @@ const App: React.FC = () => {
   
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -65,6 +67,12 @@ const App: React.FC = () => {
     };
     
     initData();
+
+    const verifyBackend = async () => {
+      const status = await checkBackendStatus();
+      setBackendStatus(status);
+    };
+    verifyBackend();
     
     // Check Tutorial Status
     const hasSeenTutorial = localStorage.getItem('hasSeenTutorial');
@@ -121,7 +129,7 @@ const App: React.FC = () => {
   // Scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isMenuOpen, isWidgetOpen]);
+  }, [messages, isMenuOpen, isWidgetOpen, isChatOpen]); // Added isChatOpen dep
 
   const triggerSuccessEffect = () => {
     setShowSuccessFlash(true);
@@ -227,7 +235,6 @@ const App: React.FC = () => {
 
     const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text };
     setMessages(prev => [...prev, userMsg]);
-    setInputValue('');
     setIsProcessing(true);
 
     const result: ExtractedData = await processUserMessage(text, records);
@@ -279,6 +286,9 @@ const App: React.FC = () => {
     }
     return 'ELIMINAR REGISTRO';
   };
+
+  // Logic to determine if chat is effectively hidden by view routing
+  const isViewHidingChat = currentView === 'settings' || currentView === 'analysis';
 
   return (
     <div className="min-h-screen dark:bg-zinc-950 bg-slate-100 dark:text-zinc-100 text-slate-800 font-rajdhani relative overflow-hidden transition-colors duration-500">
@@ -350,6 +360,9 @@ const App: React.FC = () => {
               <button onClick={() => navigateTo('history')} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${currentView === 'history' ? 'bg-cyan-100/50 dark:bg-white/10 text-cyan-700 dark:text-white font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 dark:text-zinc-400'}`}>
                 <List size={20} /> <span>Historial</span>
               </button>
+              <button onClick={() => navigateTo('analysis')} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${currentView === 'analysis' ? 'bg-cyan-100/50 dark:bg-white/10 text-cyan-700 dark:text-white font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 dark:text-zinc-400'}`}>
+                <BarChart3 size={20} /> <span>Análisis</span>
+              </button>
               <button onClick={() => navigateTo('settings')} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${currentView === 'settings' ? 'bg-cyan-100/50 dark:bg-white/10 text-cyan-700 dark:text-white font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 dark:text-zinc-400'}`}>
                 <SettingsIcon size={20} /> <span>Configuración</span>
               </button>
@@ -374,15 +387,41 @@ const App: React.FC = () => {
            </div>
         ) : (
           <>
-             {currentView === 'dashboard' && <Dashboard records={records} username={settings.nickname} settings={settings} navigateTo={navigateTo} />}
+             {currentView === 'dashboard' && <Dashboard records={records} username={settings.nickname} settings={settings} navigateTo={navigateTo} backendStatus={backendStatus} />}
              {currentView === 'history' && <HistoryView records={records} onDelete={handleRequestDelete} />}
+             {currentView === 'analysis' && <AnalysisView records={records} />}
              {currentView === 'settings' && <SettingsView settings={settings} onSave={handleUpdateSettings} />}
           </>
         )}
       </main>
 
+      {/* Chat Minimize Toggle (Floating Action Button) */}
+      {!isChatOpen && !isViewHidingChat && (
+        <button 
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-6 right-6 z-50 p-4 bg-black dark:bg-cyan-600 text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 animate-slideUp flex items-center justify-center group"
+        >
+          <Bot size={28} className="group-hover:rotate-12 transition-transform" />
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+             <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+          </span>
+        </button>
+      )}
+
       {/* Sticky Chat Interface */}
-      <div className={`fixed bottom-0 w-full z-40 glass-panel border-t transition-transform duration-300 ${currentView === 'settings' ? 'translate-y-full' : 'translate-y-0'}`}>
+      <div className={`fixed bottom-0 w-full z-40 glass-panel border-t transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${isViewHidingChat || !isChatOpen ? 'translate-y-full' : 'translate-y-0'}`}>
+        
+        {/* Minimize Handle */}
+        <div className="absolute -top-5 left-0 right-0 flex justify-center pointer-events-none">
+           <button 
+             onClick={() => setIsChatOpen(false)}
+             className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md border border-white/20 dark:border-white/10 text-slate-500 dark:text-zinc-400 rounded-t-xl px-6 py-1 shadow-lg pointer-events-auto hover:text-cyan-500 transition-colors flex items-center gap-1 text-[10px] font-bold tracking-widest uppercase"
+           >
+             Minimizar <ChevronDown size={14} />
+           </button>
+        </div>
+
         <div className="max-w-2xl mx-auto">
           <div className="max-h-64 overflow-y-auto px-4 pt-4 pb-2 space-y-3">
             {messages.slice(-4).map((msg) => (
@@ -404,28 +443,11 @@ const App: React.FC = () => {
             )}
             <div ref={messagesEndRef} />
           </div>
-
-          <div className="p-4 flex gap-2 items-center">
-            <VoiceInput onTranscript={(t) => handleSend(t)} isProcessing={isProcessing} onStateChange={(speaking) => setIsUserSpeaking(speaking)} />
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend(inputValue)}
-                placeholder="Ej: '2 residenciales y 1 poste'..."
-                className="w-full bg-white/70 dark:bg-zinc-800/50 border border-white/40 dark:border-white/10 rounded-full py-3 px-4 text-sm dark:text-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-500"
-                disabled={isProcessing}
-              />
-            </div>
-            <button
-              onClick={() => handleSend(inputValue)}
-              disabled={!inputValue.trim() || isProcessing}
-              className="p-3 bg-black dark:bg-white text-white dark:text-black rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-transform hover:scale-105 shadow-lg"
-            >
-              <Send size={20} />
-            </button>
-          </div>
+          <ChatBar 
+            onSendMessage={handleSend}
+            isProcessing={isProcessing}
+            onVoiceStateChange={setIsUserSpeaking}
+          />
         </div>
       </div>
     </div>

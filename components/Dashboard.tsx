@@ -3,16 +3,17 @@ import { InstallationRecord, InstallType, AppSettings } from '../types';
 import { LABELS, COLORS } from '../constants';
 import { StatsCard } from './StatsCard';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { DollarSign, Activity, Calendar, Zap, Wifi, WifiOff, Settings, Target } from 'lucide-react';
+import { DollarSign, Activity, Calendar, Zap, WifiOff, Settings, Target, Wrench, ServerCrash, CloudOff, Database } from 'lucide-react';
 
 interface DashboardProps {
   records: InstallationRecord[];
   username: string;
   settings: AppSettings;
   navigateTo: (view: 'dashboard' | 'history' | 'settings') => void;
+  backendStatus: 'checking' | 'connected' | 'disconnected' | 'disabled';
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ records, username, settings, navigateTo }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ records, username, settings, navigateTo, backendStatus }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -101,6 +102,51 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
   const circumference = 2 * Math.PI * 45; // r = 45
   const strokeDashoffset = circumference - (goalProgress / 100) * circumference;
 
+  // Logic for the unified status badge
+  const getStatusConfig = () => {
+    // 1. Caso: Sin Internet (Gris)
+    if (!isOnline) {
+      return {
+        colorClass: 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20',
+        text: 'SIN INTERNET',
+        icon: <WifiOff size={12} />,
+        indicatorColor: 'bg-zinc-500'
+      };
+    }
+
+    // 2. Caso: Backend Desconectado/Error (Rojo)
+    if (backendStatus === 'disconnected') {
+      return {
+        colorClass: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+        text: 'DESCONECTADO',
+        icon: <ServerCrash size={12} />,
+        indicatorColor: 'bg-red-500'
+      };
+    }
+
+    // 3. Caso: Verificando (Amarillo - Transición)
+    if (backendStatus === 'checking') {
+       return {
+        colorClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+        text: 'CONECTANDO...',
+        icon: <CloudOff size={12} />,
+        indicatorColor: 'bg-amber-500'
+      };
+    }
+
+    // 4. Caso: Backend Conectado (Verde)
+    // Nota: Si backendStatus es 'disabled' (no hay URL configurada), también mostramos verde "ONLINE" estándar
+    return {
+      colorClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+      text: backendStatus === 'connected' ? 'ONLINE' : 'ONLINE (LOCAL)',
+      icon: null, // Usamos el punto pulsante
+      indicatorColor: 'bg-emerald-500',
+      pulse: true
+    };
+  };
+
+  const status = getStatusConfig();
+
   return (
     <div className="space-y-6 pb-24 animate-fadeIn">
       <header className="mb-6 flex justify-between items-end">
@@ -109,26 +155,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
           <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium">Panel de Control</p>
         </div>
         
-        {/* Dynamic Online/Offline Indicator */}
-        <div className={`flex items-center gap-1.5 text-[10px] px-3 py-1.5 rounded-full border font-bold transition-colors duration-500 ${
-          isOnline 
-            ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' 
-            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-        }`}>
-          {isOnline ? (
-            <>
+        <div className="flex flex-col items-end gap-1.5">
+          {/* Unified Status Indicator */}
+          <div className={`flex items-center gap-1.5 text-[10px] px-3 py-1.5 rounded-full border font-bold transition-all duration-500 ${status.colorClass}`}>
+            {status.pulse ? (
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status.indicatorColor}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${status.indicatorColor}`}></span>
               </span>
-              <span className="tracking-wider">ONLINE</span>
-            </>
-          ) : (
-            <>
-              <WifiOff size={12} />
-              <span className="tracking-wider">OFFLINE</span>
-            </>
-          )}
+            ) : status.icon ? (
+              status.icon
+            ) : (
+              <span className={`h-2 w-2 rounded-full ${status.indicatorColor}`}></span>
+            )}
+            <span className="tracking-wider">{status.text}</span>
+          </div>
         </div>
       </header>
 
@@ -225,6 +266,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
           value={records.length} 
           color="text-amber-600 dark:text-amber-400"
           icon={<Activity size={24} />}
+        />
+        <StatsCard 
+          title="SERVICIOS" 
+          value={stats.countByType[InstallType.SERVICE]} 
+          color="text-amber-600 dark:text-amber-400"
+          icon={<Wrench size={24} />}
         />
       </div>
 
