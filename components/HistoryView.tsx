@@ -70,6 +70,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onDelete }) =
         >
           POSTE
         </button>
+        <button 
+          onClick={() => setFilterType(InstallType.SERVICE)}
+          className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${
+            filterType === InstallType.SERVICE
+              ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700' 
+              : 'glass-panel text-slate-500 dark:text-zinc-500'
+          }`}
+        >
+          SERVICIO
+        </button>
       </div>
 
       {/* Summary of current view */}
@@ -93,14 +103,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onDelete }) =
                   <span className={`w-2 h-2 rounded-full ${
                      rec.type === InstallType.RESIDENTIAL ? 'bg-cyan-400' :
                      rec.type === InstallType.CORPORATE ? 'bg-violet-400' :
+                     rec.type === InstallType.SERVICE ? 'bg-amber-400' :
                      'bg-emerald-400'
                   }`} />
                   <span className={`text-xs font-bold tracking-wider uppercase ${
                      rec.type === InstallType.RESIDENTIAL ? 'text-cyan-700 dark:text-cyan-300' :
                      rec.type === InstallType.CORPORATE ? 'text-violet-700 dark:text-violet-300' :
+                     rec.type === InstallType.SERVICE ? 'text-amber-700 dark:text-amber-300' :
                      'text-emerald-700 dark:text-emerald-300'
                   }`}>
-                    {rec.type}
+                    {rec.type === 'SERVICE' ? 'SERVICIO' : rec.type}
                   </span>
                 </div>
                 <span className="text-xs text-slate-500 dark:text-zinc-500 font-medium">

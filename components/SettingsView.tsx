@@ -3,7 +3,9 @@ import { AppSettings, InstallType } from '../types';
 import { LABELS } from '../constants';
 import { exportBackupData, importBackupData } from '../services/storageService';
 import { validateApiKey } from '../services/geminiService';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2 } from 'lucide-react';
+// FIX: Import `getEffectiveApiKey` to resolve "Cannot find name" error.
+import { getEffectiveApiKey } from '../services/settingsService';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -19,7 +21,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
 
   // Check input validity visually
   useEffect(() => {
-    const key = localSettings.apiKey?.trim();
+    const key = localSettings.apiKey?.trim() || getEffectiveApiKey();
     if (key && key.length > 20) {
       if (apiKeyStatus !== 'validating') setApiKeyStatus('ok');
     } else {
@@ -67,8 +69,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     if (!key) return;
 
     setApiKeyStatus('validating');
-    // Force save first so service can use it if needed, though we validate explicitly
-    onSave(localSettings);
+    onSave(localSettings); // Save first so service can use it
     
     const isValid = await validateApiKey(key);
     if (isValid) {
@@ -226,6 +227,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
              placeholder="Técnico"
              className="w-32 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-medium text-sm dark:text-white text-slate-900"
           />
+        </div>
+      </section>
+      
+      {/* Goal Section */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">METAS DE PRODUCCIÓN</h3>
+        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl">
+          <div className="flex items-center gap-3">
+            <Target className="text-emerald-500 dark:text-emerald-400" />
+            <div>
+              <span className="block font-bold dark:text-white text-slate-800 text-sm">Meta Mensual</span>
+              <span className="text-[10px] dark:text-zinc-500 text-slate-500">
+                Tu objetivo de ingresos
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <DollarSign size={14} className="text-slate-400" />
+            <input 
+               type="number"
+               value={localSettings.monthlyGoal > 0 ? localSettings.monthlyGoal : ''}
+               onChange={(e) => setLocalSettings(p => ({ ...p, monthlyGoal: parseFloat(e.target.value) || 0 }))}
+               placeholder="0"
+               className="w-24 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-medium text-lg dark:text-white text-slate-900"
+            />
+          </div>
         </div>
       </section>
 

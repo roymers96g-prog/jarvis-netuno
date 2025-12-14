@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { InstallType } from '../types';
-import { Home, Briefcase, MapPin, Zap, Check } from 'lucide-react';
+import { Home, Briefcase, MapPin, Zap, Check, Wrench } from 'lucide-react';
 
 interface QuickWidgetProps {
   onQuickAdd: (type: InstallType) => void;
@@ -17,7 +17,6 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
   const handlePress = (type: InstallType) => {
     setClickedType(type);
     
-    // Short delay to show animation before closing
     setTimeout(() => {
       onQuickAdd(type);
       setClickedType(null);
@@ -34,13 +33,8 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
-      {/* 
-         DARK MODE FIX: Changed dark:bg-slate-800 to dark:bg-zinc-950 (Elegant Black) 
-         LIGHT MODE FIX: Changed bg-white/95 to bg-blue-50/95 (Classic Blue Tint)
-      */}
       <div className="w-full max-w-sm dark:bg-zinc-950 bg-blue-50/95 border dark:border-zinc-800 border-white/50 rounded-3xl p-6 shadow-2xl animate-scaleIn transform transition-all relative overflow-hidden" onClick={e => e.stopPropagation()}>
         
-        {/* Decorative background blob for light mode to enhance "Classic Blue" feel */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none dark:opacity-0" />
 
         <div className="flex justify-between items-center mb-6 relative z-10">
@@ -51,7 +45,6 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
         </div>
         
         <div className="grid grid-cols-2 gap-4 relative z-10">
-          {/* Residencial Button */}
           <button 
             onClick={() => handlePress(InstallType.RESIDENTIAL)}
             disabled={!!clickedType}
@@ -63,16 +56,11 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
               'bg-cyan-500 text-white dark:bg-cyan-600'
             )}`}
           >
-            {clickedType === InstallType.RESIDENTIAL ? (
-              <Check size={32} className="text-white animate-scaleIn" strokeWidth={3} />
-            ) : (
-              <Home size={32} className="text-cyan-400 mb-2 group-hover:scale-110 transition-transform" />
-            )}
+            {clickedType === InstallType.RESIDENTIAL ? <Check size={32} className="text-white animate-scaleIn" strokeWidth={3} /> : <Home size={32} className="text-cyan-400 mb-2 group-hover:scale-110 transition-transform" />}
             <span className={`text-lg font-bold ${clickedType === InstallType.RESIDENTIAL ? 'text-white' : 'dark:text-zinc-100 text-slate-800'}`}>Residencial</span>
             {!clickedType && <span className="text-sm text-cyan-500 dark:text-cyan-300 font-mono">${prices[InstallType.RESIDENTIAL]}</span>}
           </button>
 
-          {/* Corporativo Button */}
           <button 
             onClick={() => handlePress(InstallType.CORPORATE)}
             disabled={!!clickedType}
@@ -84,20 +72,15 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
               'bg-violet-500 text-white dark:bg-violet-600'
             )}`}
           >
-            {clickedType === InstallType.CORPORATE ? (
-               <Check size={32} className="text-white animate-scaleIn" strokeWidth={3} />
-            ) : (
-               <Briefcase size={32} className="text-violet-400 mb-2 group-hover:scale-110 transition-transform" />
-            )}
+            {clickedType === InstallType.CORPORATE ? <Check size={32} className="text-white animate-scaleIn" strokeWidth={3} /> : <Briefcase size={32} className="text-violet-400 mb-2 group-hover:scale-110 transition-transform" />}
             <span className={`text-lg font-bold ${clickedType === InstallType.CORPORATE ? 'text-white' : 'dark:text-zinc-100 text-slate-800'}`}>Corporativo</span>
             {!clickedType && <span className="text-sm text-violet-500 dark:text-violet-300 font-mono">${prices[InstallType.CORPORATE]}</span>}
           </button>
-
-          {/* Poste Button */}
+          
           <button 
             onClick={() => handlePress(InstallType.POSTE)}
             disabled={!!clickedType}
-            className={`group relative flex flex-col items-center justify-center p-6 rounded-2xl col-span-2 ${getButtonClass(
+            className={`group relative flex flex-col items-center justify-center p-6 rounded-2xl ${getButtonClass(
               InstallType.POSTE,
               'border-emerald-100',
               'hover:border-emerald-400',
@@ -105,17 +88,25 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
               'bg-emerald-500 text-white dark:bg-emerald-600'
             )}`}
           >
-            <div className="flex items-center gap-4">
-              {clickedType === InstallType.POSTE ? (
-                 <Check size={32} className="text-white animate-scaleIn" strokeWidth={3} />
-              ) : (
-                 <MapPin size={32} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-              )}
-              <div className="text-left">
-                <span className={`block text-lg font-bold ${clickedType === InstallType.POSTE ? 'text-white' : 'dark:text-zinc-100 text-slate-800'}`}>Instalación Poste</span>
-                {!clickedType && <span className="block text-sm text-emerald-500 dark:text-emerald-300 font-mono">${prices[InstallType.POSTE]}</span>}
-              </div>
-            </div>
+            {clickedType === InstallType.POSTE ? <Check size={32} className="text-white animate-scaleIn" strokeWidth={3} /> : <MapPin size={32} className="text-emerald-400 mb-2 group-hover:scale-110 transition-transform" />}
+            <span className={`text-lg font-bold ${clickedType === InstallType.POSTE ? 'text-white' : 'dark:text-zinc-100 text-slate-800'}`}>Poste</span>
+            {!clickedType && <span className="text-sm text-emerald-500 dark:text-emerald-300 font-mono">${prices[InstallType.POSTE]}</span>}
+          </button>
+
+          <button 
+            onClick={() => handlePress(InstallType.SERVICE)}
+            disabled={!!clickedType}
+            className={`group relative flex flex-col items-center justify-center p-6 rounded-2xl ${getButtonClass(
+              InstallType.SERVICE,
+              'border-amber-100',
+              'hover:border-amber-400',
+              'hover:bg-amber-50',
+              'bg-amber-500 text-white dark:bg-amber-600'
+            )}`}
+          >
+            {clickedType === InstallType.SERVICE ? <Check size={32} className="text-white animate-scaleIn" strokeWidth={3} /> : <Wrench size={32} className="text-amber-400 mb-2 group-hover:scale-110 transition-transform" />}
+            <span className={`text-lg font-bold ${clickedType === InstallType.SERVICE ? 'text-white' : 'dark:text-zinc-100 text-slate-800'}`}>Servicio</span>
+            {!clickedType && <span className="text-sm text-amber-500 dark:text-amber-300 font-mono">${prices[InstallType.SERVICE]}</span>}
           </button>
         </div>
       </div>

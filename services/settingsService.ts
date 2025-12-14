@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',   // Empty by default
   ttsEnabled: true,
   theme: 'dark',
+  monthlyGoal: 0,
   customPrices: { ...DEFAULT_PRICES },
   voiceSettings: {
     voiceURI: '', // Auto-select logic will handle empty string

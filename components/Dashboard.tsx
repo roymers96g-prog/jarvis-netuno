@@ -1,16 +1,18 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { InstallationRecord, InstallType } from '../types';
+import { InstallationRecord, InstallType, AppSettings } from '../types';
 import { LABELS, COLORS } from '../constants';
 import { StatsCard } from './StatsCard';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { DollarSign, Activity, Calendar, Zap, Wifi, WifiOff } from 'lucide-react';
+import { DollarSign, Activity, Calendar, Zap, Wifi, WifiOff, Settings, Target } from 'lucide-react';
 
 interface DashboardProps {
   records: InstallationRecord[];
   username: string;
+  settings: AppSettings;
+  navigateTo: (view: 'dashboard' | 'history' | 'settings') => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ records, username, settings, navigateTo }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
   const stats = useMemo(() => {
     const now = new Date();
     // Use Local Date String for comparison (YYYY-MM-DD in local time)
-    const todayStr = now.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD format
+    const todayStr = now.toLocaleDateString('en-CA'); // en-CA gives YYY-MM-DD format
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
@@ -41,11 +43,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
       [InstallType.RESIDENTIAL]: 0,
       [InstallType.CORPORATE]: 0,
       [InstallType.POSTE]: 0,
+      [InstallType.SERVICE]: 0,
     };
 
     records.forEach(r => {
       const rDate = new Date(r.date);
-      // Convert record date to local YYYY-MM-DD for comparison
+      // Convert record date to local YYY-MM-DD for comparison
       const rDateStr = rDate.toLocaleDateString('en-CA');
       
       const isThisMonth = rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
@@ -67,6 +70,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
     { name: LABELS[InstallType.RESIDENTIAL], value: stats.countByType[InstallType.RESIDENTIAL], color: COLORS[InstallType.RESIDENTIAL] },
     { name: LABELS[InstallType.CORPORATE], value: stats.countByType[InstallType.CORPORATE], color: COLORS[InstallType.CORPORATE] },
     { name: LABELS[InstallType.POSTE], value: stats.countByType[InstallType.POSTE], color: COLORS[InstallType.POSTE] },
+    { name: LABELS[InstallType.SERVICE], value: stats.countByType[InstallType.SERVICE], color: COLORS[InstallType.SERVICE] },
   ].filter(d => d.value > 0);
 
   const chartData = useMemo(() => {
@@ -77,7 +81,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toLocaleDateString('en-CA'); // YYYY-MM-DD Local
+      const dateStr = d.toLocaleDateString('en-CA'); // YYY-MM-DD Local
       const dayLabel = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase();
       
       const dayAmount = records
@@ -92,6 +96,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
     }
     return result;
   }, [records]);
+
+  const goalProgress = settings.monthlyGoal > 0 ? Math.min(100, (stats.monthTotal / settings.monthlyGoal) * 100) : 0;
+  const circumference = 2 * Math.PI * 45; // r = 45
+  const strokeDashoffset = circumference - (goalProgress / 100) * circumference;
 
   return (
     <div className="space-y-6 pb-24 animate-fadeIn">
@@ -124,6 +132,76 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
         </div>
       </header>
 
+      {/* Monthly Goal Section */}
+      <div className="glass-panel rounded-3xl p-6 flex flex-col items-center relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent animate-pulse" />
+        <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-4 self-start flex items-center gap-2">
+          <Target size={12} />
+          META MENSUAL
+        </h3>
+        {settings.monthlyGoal > 0 ? (
+          <div className="w-full flex flex-col items-center animate-scaleIn">
+            <div className="relative w-32 h-32">
+              <svg className="w-full h-full" viewBox="0 0 100 100">
+                {/* Background circle */}
+                <circle
+                  className="text-slate-200 dark:text-zinc-800"
+                  strokeWidth="10"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="45"
+                  cx="50"
+                  cy="50"
+                />
+                {/* Progress circle */}
+                <circle
+                  className="text-cyan-500"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="45"
+                  cx="50"
+                  cy="50"
+                  style={{
+                    strokeDasharray: circumference,
+                    strokeDashoffset: strokeDashoffset,
+                    transform: 'rotate(-90deg)',
+                    transformOrigin: '50% 50%',
+                    transition: 'stroke-dashoffset 0.8s ease-out'
+                  }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold dark:text-white text-slate-900">{Math.round(goalProgress)}%</span>
+              </div>
+            </div>
+            <div className="text-center mt-4">
+              <p className="font-bold text-lg dark:text-white text-slate-800">${stats.monthTotal.toFixed(0)} de ${settings.monthlyGoal}</p>
+              <p className="text-xs text-slate-500 dark:text-zinc-500">
+                {stats.monthTotal >= settings.monthlyGoal
+                  ? '¡Meta alcanzada! 🎉'
+                  : `Faltan $${(settings.monthlyGoal - stats.monthTotal).toFixed(0)} para la meta`
+                }
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 w-full animate-fadeIn">
+            <Target size={32} className="mx-auto text-slate-400 dark:text-zinc-600 mb-2" />
+            <p className="text-slate-600 dark:text-zinc-400 font-bold mb-1">Define un objetivo</p>
+            <p className="text-xs text-slate-500 dark:text-zinc-500 mb-4">Establece una meta de ingresos para ver tu progreso aquí.</p>
+            <button
+              onClick={() => navigateTo('settings')}
+              className="flex items-center gap-2 mx-auto px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-full hover:scale-105 transition-transform"
+            >
+              <Settings size={14} />
+              Ir a Configuración
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <StatsCard 
           title="HOY" 
@@ -143,7 +221,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
           icon={<DollarSign size={24} />}
         />
          <StatsCard 
-          title="INSTALACIONES" 
+          title="ACTIVIDADES" 
           value={records.length} 
           color="text-amber-600 dark:text-amber-400"
           icon={<Activity size={24} />}
@@ -230,7 +308,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username }) => {
               </PieChart>
             </ResponsiveContainer>
          </div>
-         <div className="flex gap-4 mt-2 text-xs font-medium">
+         <div className="flex flex-wrap justify-center gap-2 mt-2 text-xs font-medium">
             {pieData.map(d => (
               <div key={d.name} className="flex items-center gap-1.5 bg-white/50 dark:bg-white/5 px-3 py-1 rounded-full border border-white/20 dark:border-white/5">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />

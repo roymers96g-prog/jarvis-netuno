@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRecords, saveRecord, deleteRecord } from './services/storageService';
-import { processUserMessage } from './services/geminiService';
+import { processLoggingMessage, processQueryMessage, resetChat } from './services/geminiService';
 import { getSettings, saveSettings } from './services/settingsService';
 import { Dashboard } from './components/Dashboard';
 import { HistoryView } from './components/HistoryView';
@@ -31,6 +31,7 @@ const App: React.FC = () => {
   const [isJarvisSpeaking, setIsJarvisSpeaking] = useState(false);
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [showBackupIndicator, setShowBackupIndicator] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   
   // Tutorial State
   const [showTutorial, setShowTutorial] = useState(false);
@@ -52,7 +53,18 @@ const App: React.FC = () => {
 
   // Initialize Data & PWA check
   useEffect(() => {
-    setRecords(getRecords());
+    const initData = async () => {
+      try {
+        const data = await getRecords();
+        setRecords(data);
+      } catch (e) {
+        console.error("Error loading data", e);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    
+    initData();
     
     // Check Tutorial Status
     const hasSeenTutorial = localStorage.getItem('hasSeenTutorial');
@@ -60,7 +72,7 @@ const App: React.FC = () => {
       setShowTutorial(true);
     }
 
-    // Check Nickname Status - If missing (new or existing user update), show modal
+    // Check Nickname Status
     if (!settings.nickname) {
        setIsNicknameModalOpen(true);
     }
@@ -124,19 +136,16 @@ const App: React.FC = () => {
     setTimeout(() => setShowBackupIndicator(false), 2000);
   };
 
-  // TTS Helper - Improved for Jarvis-like voice + Animation
+  // TTS Helper
   const speakText = (text: string) => {
     if (settings.ttsEnabled && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'es-ES';
-      
-      // Use defaults (0.8 pitch, 1.1 rate) if user hasn't overridden them significantly
       utterance.pitch = settings.voiceSettings.pitch;
       utterance.rate = settings.voiceSettings.rate;
 
-      // Select Voice Logic
       const voices = window.speechSynthesis.getVoices();
       if (settings.voiceSettings.voiceURI) {
         const selected = voices.find(v => v.voiceURI === settings.voiceSettings.voiceURI);
@@ -152,7 +161,6 @@ const App: React.FC = () => {
         }
       }
 
-      // Animation Hooks
       utterance.onstart = () => setIsJarvisSpeaking(true);
       utterance.onend = () => setIsJarvisSpeaking(false);
       utterance.onerror = () => setIsJarvisSpeaking(false);
@@ -163,6 +171,10 @@ const App: React.FC = () => {
   };
 
   const handleUpdateSettings = (newSettings: AppSettings) => {
+    // If API key changed, reset the chat session to use the new key
+    if (settings.apiKey !== newSettings.apiKey) {
+        resetChat();
+    }
     setSettings(newSettings);
     saveSettings(newSettings);
   };
@@ -179,25 +191,22 @@ const App: React.FC = () => {
     setShowTutorial(false);
   };
 
-  // PWA Install Handler
   const handleInstallClick = async () => {
     if (deferredPrompt) {
-      // Automatic Prompt available
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
       }
     } else {
-      // Manual Instructions needed (iOS or prompt already dismissed/unavailable)
       setIsInstallModalOpen(true);
     }
     setIsMenuOpen(false);
   };
 
-  // Handle Quick Add via Widget
-  const handleQuickAdd = (type: InstallType) => {
-    const newRecordsList = saveRecord(type, 1);
+  // ASYNC: Handle Quick Add via Widget
+  const handleQuickAdd = async (type: InstallType) => {
+    const newRecordsList = await saveRecord(type, 1);
     setRecords(newRecordsList);
     triggerSuccessEffect();
     
@@ -212,30 +221,36 @@ const App: React.FC = () => {
     speakText(responseText);
   };
 
-  // Handle User Input
+  // ASYNC: Handle User Input
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
 
-    // Add User Message
     const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text };
     setMessages(prev => [...prev, userMsg]);
     setInputValue('');
     setIsProcessing(true);
 
-    // Call Gemini
-    const result: ExtractedData = await processUserMessage(text, new Date().toDateString());
+    // Client-side intent detection
+    const queryKeywords = ['cuánto', 'cuanto', 'cómo voy', 'como voy', 'total', 'resumen', 'llevo', 'ganancias'];
+    const isQuery = queryKeywords.some(keyword => text.toLowerCase().includes(keyword));
 
-    // Process Records
+    let result: ExtractedData;
+
+    if (isQuery) {
+        result = await processQueryMessage(text, records);
+    } else {
+        result = await processLoggingMessage(text);
+    }
+
     if (result.records && result.records.length > 0) {
-      let newRecordsList: InstallationRecord[] = [];
-      result.records.forEach(rec => {
-        newRecordsList = saveRecord(rec.type as any, rec.quantity, rec.date);
-      });
-      setRecords(newRecordsList); 
+      let currentList = [...records];
+      for (const rec of result.records) {
+         currentList = await saveRecord(rec.type as any, rec.quantity, rec.date);
+      }
+      setRecords(currentList); 
       triggerSuccessEffect();
     }
 
-    // Add Jarvis Response
     const jarvisMsg: ChatMessage = { 
       id: (Date.now() + 1).toString(), 
       sender: 'jarvis', 
@@ -251,12 +266,13 @@ const App: React.FC = () => {
     setRecordToDelete(id);
   };
 
-  const confirmDelete = () => {
+  // ASYNC: Confirm Delete
+  const confirmDelete = async () => {
     if (recordToDelete) {
-      const updated = deleteRecord(recordToDelete);
+      const updated = await deleteRecord(recordToDelete);
       setRecords(updated);
       setRecordToDelete(null);
-      triggerBackupIndicator(); // Trigger backup visual on delete too
+      triggerBackupIndicator();
     }
   };
 
@@ -265,7 +281,6 @@ const App: React.FC = () => {
     setIsMenuOpen(false);
   };
 
-  // Helper to get title for delete modal
   const getDeleteModalTitle = () => {
     if (!recordToDelete) return 'ELIMINAR';
     const rec = records.find(r => r.id === recordToDelete);
@@ -280,14 +295,9 @@ const App: React.FC = () => {
       
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        {/* SCANLINE EFFECT - Adds dynamism */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent h-[10%] w-full animate-scanline z-0 pointer-events-none" />
-        
-        {/* Light Mode: Blue Accents */}
         <div className="dark:hidden absolute top-0 left-0 w-full h-full bg-gradient-to-b from-blue-50 to-slate-100" />
         <div className="dark:hidden absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-400/20 rounded-full blur-[100px]" />
-        
-        {/* Dark Mode: Elegant Gray/Black - No loud colors */}
         <div className="hidden dark:block absolute top-0 left-0 w-full h-[300px] bg-gradient-to-b from-zinc-900/50 to-transparent" />
         <div className="hidden dark:block absolute top-[-10%] left-[-10%] w-[400px] h-[400px] bg-zinc-800/20 rounded-full blur-[80px]" />
       </div>
@@ -300,10 +310,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* GEMINI VOICE VISUALIZER - JARVIS */}
       <VoiceVisualizer isActive={isJarvisSpeaking} mode="jarvis" />
-      
-      {/* USER VOICE VISUALIZER - GREEN/EMERALD */}
       <VoiceVisualizer isActive={isUserSpeaking} mode="user" />
 
       {/* BACKUP INDICATOR TOAST */}
@@ -315,37 +322,17 @@ const App: React.FC = () => {
       </div>
 
       {/* MODALS */}
-      
-      {/* 1. Install Instruction Modal */}
-      <InstallModal 
-        isOpen={isInstallModalOpen} 
-        onClose={() => setIsInstallModalOpen(false)} 
-        isIOS={isIOS}
-      />
-
-      {/* 2. Nickname Modal */}
-      <NicknameModal 
-        isOpen={isNicknameModalOpen} 
-        onSave={handleSaveNickname} 
-      />
-
-      {/* 3. Tutorial */}
-      {showTutorial && !isNicknameModalOpen && (
-        <WelcomeTutorial 
-          onComplete={handleTutorialComplete} 
-          username={settings.nickname}
-        />
-      )}
+      <InstallModal isOpen={isInstallModalOpen} onClose={() => setIsInstallModalOpen(false)} isIOS={isIOS} />
+      <NicknameModal isOpen={isNicknameModalOpen} onSave={handleSaveNickname} />
+      {showTutorial && !isNicknameModalOpen && <WelcomeTutorial onComplete={handleTutorialComplete} username={settings.nickname} />}
 
       {/* Header */}
       <nav className="fixed top-0 w-full glass-panel z-50 h-20 flex items-center justify-between px-4 transition-all border-b border-white/10 shadow-sm backdrop-blur-xl">
         <div className="flex items-center gap-3" onClick={() => navigateTo('dashboard')}>
-          {/* Animated Aperture Icon for Professional/Tech Look */}
           <div className="relative">
              <Aperture size={32} className="text-cyan-600 dark:text-cyan-400 animate-spin-slow" />
              <div className="absolute inset-0 bg-cyan-400/20 blur-lg rounded-full animate-pulse" />
           </div>
-          
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold tracking-[0.2em] leading-none dark:text-zinc-100 text-slate-900">NETUNO</h1>
             <span className="text-[10px] text-cyan-600 dark:text-cyan-500 font-mono tracking-widest font-bold">JARVIS SYSTEM v7.2</span>
@@ -353,16 +340,10 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setIsWidgetOpen(true)}
-            className="p-3 text-cyan-700 dark:text-zinc-400 hover:text-cyan-900 dark:hover:text-white transition-colors bg-white/50 dark:bg-zinc-800/50 rounded-lg backdrop-blur border border-white/20 dark:border-white/5 shadow-inner"
-          >
+          <button onClick={() => setIsWidgetOpen(true)} className="p-3 text-cyan-700 dark:text-zinc-400 hover:text-cyan-900 dark:hover:text-white transition-colors bg-white/50 dark:bg-zinc-800/50 rounded-lg backdrop-blur border border-white/20 dark:border-white/5 shadow-inner">
             <LayoutGrid size={22} />
           </button>
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-3 text-slate-700 dark:text-zinc-400 transition-colors hover:text-black dark:hover:text-white"
-          >
+          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-3 text-slate-700 dark:text-zinc-400 transition-colors hover:text-black dark:hover:text-white">
             {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
@@ -373,25 +354,17 @@ const App: React.FC = () => {
         <div className="fixed top-20 right-0 w-64 glass-panel border-l border-b rounded-bl-3xl z-[60] shadow-2xl animate-fadeIn p-4 h-[calc(100vh-5rem)]">
            <div className="flex flex-col gap-3">
               <span className="text-xs dark:text-zinc-500 text-slate-400 font-bold tracking-widest uppercase mb-1">Navegación</span>
-              
               <button onClick={() => navigateTo('dashboard')} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${currentView === 'dashboard' ? 'bg-cyan-100/50 dark:bg-white/10 text-cyan-700 dark:text-white font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 dark:text-zinc-400'}`}>
                 <LayoutDashboard size={20} /> <span>Panel Principal</span>
               </button>
-              
               <button onClick={() => navigateTo('history')} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${currentView === 'history' ? 'bg-cyan-100/50 dark:bg-white/10 text-cyan-700 dark:text-white font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 dark:text-zinc-400'}`}>
                 <List size={20} /> <span>Historial</span>
               </button>
-              
               <button onClick={() => navigateTo('settings')} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${currentView === 'settings' ? 'bg-cyan-100/50 dark:bg-white/10 text-cyan-700 dark:text-white font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5 dark:text-zinc-400'}`}>
                 <SettingsIcon size={20} /> <span>Configuración</span>
               </button>
-
               <div className="h-px bg-slate-200 dark:bg-white/10 my-2" />
-              
-              <button 
-                onClick={handleInstallClick}
-                className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 dark:bg-white dark:text-black text-white shadow-lg hover:scale-105 transition-transform"
-              >
+              <button onClick={handleInstallClick} className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 dark:bg-white dark:text-black text-white shadow-lg hover:scale-105 transition-transform">
                 {isIOS ? <Share size={20} /> : <Download size={20} />}
                 <span className="font-bold">Instalar App</span>
               </button>
@@ -399,47 +372,32 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Widget Overlay */}
-      <QuickWidget 
-        isOpen={isWidgetOpen} 
-        onClose={() => setIsWidgetOpen(false)} 
-        onQuickAdd={handleQuickAdd} 
-        prices={settings.customPrices}
-      />
-
-      {/* Delete Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={!!recordToDelete}
-        onClose={() => setRecordToDelete(null)}
-        onConfirm={confirmDelete}
-        title={getDeleteModalTitle()}
-        message="¿Eliminar este registro permanentemente?"
-      />
+      <QuickWidget isOpen={isWidgetOpen} onClose={() => setIsWidgetOpen(false)} onQuickAdd={handleQuickAdd} prices={settings.customPrices} />
+      <ConfirmationModal isOpen={!!recordToDelete} onClose={() => setRecordToDelete(null)} onConfirm={confirmDelete} title={getDeleteModalTitle()} message="¿Eliminar este registro permanentemente?" />
 
       {/* Main Content Area */}
       <main className="pt-28 px-4 pb-48 max-w-2xl mx-auto z-10 relative min-h-screen">
-        {currentView === 'dashboard' && <Dashboard records={records} username={settings.nickname} />}
-        {currentView === 'history' && <HistoryView records={records} onDelete={handleRequestDelete} />}
-        {currentView === 'settings' && <SettingsView settings={settings} onSave={handleUpdateSettings} />}
+        {isLoadingData ? (
+           <div className="flex flex-col items-center justify-center py-20 opacity-50">
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500 mb-2"></div>
+             <span className="text-xs tracking-widest text-slate-500 dark:text-zinc-500">SINCRONIZANDO DATOS...</span>
+           </div>
+        ) : (
+          <>
+             {currentView === 'dashboard' && <Dashboard records={records} username={settings.nickname} settings={settings} navigateTo={navigateTo} />}
+             {currentView === 'history' && <HistoryView records={records} onDelete={handleRequestDelete} />}
+             {currentView === 'settings' && <SettingsView settings={settings} onSave={handleUpdateSettings} />}
+          </>
+        )}
       </main>
 
       {/* Sticky Chat Interface */}
       <div className={`fixed bottom-0 w-full z-40 glass-panel border-t transition-transform duration-300 ${currentView === 'settings' ? 'translate-y-full' : 'translate-y-0'}`}>
         <div className="max-w-2xl mx-auto">
-          {/* Chat History Overlay */}
           <div className="max-h-64 overflow-y-auto px-4 pt-4 pb-2 space-y-3">
             {messages.slice(-4).map((msg) => (
-              <div 
-                key={msg.id} 
-                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`
-                  max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm backdrop-blur-sm
-                  ${msg.sender === 'user' 
-                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-zinc-700 dark:to-zinc-800 text-white rounded-br-none' 
-                    : 'bg-white/60 dark:bg-white/10 dark:text-zinc-200 text-slate-800 border border-white/20 dark:border-white/5 rounded-bl-none'
-                  }
-                `}>
+              <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm backdrop-blur-sm ${msg.sender === 'user' ? 'bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-zinc-700 dark:to-zinc-800 text-white rounded-br-none' : 'bg-white/60 dark:bg-white/10 dark:text-zinc-200 text-slate-800 border border-white/20 dark:border-white/5 rounded-bl-none'}`}>
                   {msg.text}
                 </div>
               </div>
@@ -457,14 +415,8 @@ const App: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
           <div className="p-4 flex gap-2 items-center">
-            <VoiceInput 
-              onTranscript={(t) => handleSend(t)} 
-              isProcessing={isProcessing}
-              onStateChange={(speaking) => setIsUserSpeaking(speaking)} 
-            />
-            
+            <VoiceInput onTranscript={(t) => handleSend(t)} isProcessing={isProcessing} onStateChange={(speaking) => setIsUserSpeaking(speaking)} />
             <div className="flex-1 relative">
               <input
                 type="text"
@@ -476,7 +428,6 @@ const App: React.FC = () => {
                 disabled={isProcessing}
               />
             </div>
-            
             <button
               onClick={() => handleSend(inputValue)}
               disabled={!inputValue.trim() || isProcessing}
@@ -487,7 +438,6 @@ const App: React.FC = () => {
           </div>
         </div>
       </div>
-
     </div>
   );
 };

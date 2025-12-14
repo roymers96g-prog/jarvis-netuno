@@ -1,7 +1,8 @@
 export enum InstallType {
   RESIDENTIAL = 'RESIDENTIAL',
   CORPORATE = 'CORPORATE',
-  POSTE = 'POSTE'
+  POSTE = 'POSTE',
+  SERVICE = 'SERVICE'
 }
 
 export interface InstallationRecord {
@@ -47,6 +48,7 @@ export interface AppSettings {
   apiKey: string; // Manual API Key override
   ttsEnabled: boolean;
   theme: 'dark' | 'light';
+  monthlyGoal: number;
   customPrices: {
     [key in InstallType]: number;
   };
