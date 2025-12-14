@@ -3,7 +3,7 @@ import { InstallationRecord, InstallType, AppSettings } from '../types';
 import { LABELS, COLORS } from '../constants';
 import { StatsCard } from './StatsCard';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { DollarSign, Activity, Calendar, Zap, WifiOff, Settings, Target, Wrench, ServerCrash, CloudOff, Database } from 'lucide-react';
+import { DollarSign, Activity, Calendar, Zap, WifiOff, Settings, Target, Wrench, ServerCrash, CloudOff, Flame } from 'lucide-react';
 
 interface DashboardProps {
   records: InstallationRecord[];
@@ -31,7 +31,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
   
   const stats = useMemo(() => {
     const now = new Date();
-    // Use Local Date String for comparison (YYYY-MM-DD in local time)
     const todayStr = now.toLocaleDateString('en-CA'); // en-CA gives YYY-MM-DD format
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -49,7 +48,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
 
     records.forEach(r => {
       const rDate = new Date(r.date);
-      // Convert record date to local YYY-MM-DD for comparison
       const rDateStr = rDate.toLocaleDateString('en-CA');
       
       const isThisMonth = rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
@@ -65,6 +63,45 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     });
 
     return { monthTotal, todayTotal, allTotal, countByType };
+  }, [records]);
+
+  // Streak Calculation
+  const streak = useMemo(() => {
+    if (records.length === 0) return 0;
+    
+    // Get unique dates sorted descending
+    // Explicitly type as string[] to satisfy TypeScript compiler
+    const uniqueDates: string[] = Array.from(new Set(records.map(r => new Date(r.date).toLocaleDateString('en-CA')))).sort().reverse();
+    
+    if (uniqueDates.length === 0) return 0;
+
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+
+    // If no entry today or yesterday, streak is 0 (unless we want to be lenient about today)
+    // Let's assume strict: if last entry wasn't today or yesterday, streak broken.
+    if (uniqueDates[0] !== todayStr && uniqueDates[0] !== yesterdayStr) {
+      return 0;
+    }
+
+    let currentStreak = 1;
+    let lastDate = new Date(uniqueDates[0]);
+
+    for (let i = 1; i < uniqueDates.length; i++) {
+      const currDate = new Date(uniqueDates[i]);
+      const diffTime = Math.abs(lastDate.getTime() - currDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      
+      if (diffDays === 1) {
+        currentStreak++;
+        lastDate = currDate;
+      } else {
+        break;
+      }
+    }
+    return currentStreak;
   }, [records]);
 
   const pieData = [
@@ -87,7 +124,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
       
       const dayAmount = records
         .filter(r => {
-           // Convert record ISO to Local Date String for comparison
            const rLoc = new Date(r.date).toLocaleDateString('en-CA');
            return rLoc === dateStr;
         })
@@ -102,9 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
   const circumference = 2 * Math.PI * 45; // r = 45
   const strokeDashoffset = circumference - (goalProgress / 100) * circumference;
 
-  // Logic for the unified status badge
   const getStatusConfig = () => {
-    // 1. Caso: Sin Internet (Gris)
     if (!isOnline) {
       return {
         colorClass: 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20',
@@ -113,8 +147,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
         indicatorColor: 'bg-zinc-500'
       };
     }
-
-    // 2. Caso: Backend Desconectado/Error (Rojo)
     if (backendStatus === 'disconnected') {
       return {
         colorClass: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
@@ -123,8 +155,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
         indicatorColor: 'bg-red-500'
       };
     }
-
-    // 3. Caso: Verificando (Amarillo - Transición)
     if (backendStatus === 'checking') {
        return {
         colorClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
@@ -133,13 +163,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
         indicatorColor: 'bg-amber-500'
       };
     }
-
-    // 4. Caso: Backend Conectado (Verde)
-    // Nota: Si backendStatus es 'disabled' (no hay URL configurada), también mostramos verde "ONLINE" estándar
     return {
       colorClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
       text: backendStatus === 'connected' ? 'ONLINE' : 'ONLINE (LOCAL)',
-      icon: null, // Usamos el punto pulsante
+      icon: null,
       indicatorColor: 'bg-emerald-500',
       pulse: true
     };
@@ -152,11 +179,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
       <header className="mb-6 flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold dark:text-white text-slate-800 tracking-tight">Hola, {username || 'Técnico'}</h2>
-          <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium">Panel de Control</p>
+          <div className="flex items-center gap-2 mt-1">
+             <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium">Panel de Control</p>
+             {streak > 0 && (
+                <div className="flex items-center gap-1 bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-bold border border-orange-500/20 animate-pulse">
+                   <Flame size={10} fill="currentColor" /> {streak} DÍAS
+                </div>
+             )}
+          </div>
         </div>
         
         <div className="flex flex-col items-end gap-1.5">
-          {/* Unified Status Indicator */}
           <div className={`flex items-center gap-1.5 text-[10px] px-3 py-1.5 rounded-full border font-bold transition-all duration-500 ${status.colorClass}`}>
             {status.pulse ? (
               <span className="relative flex h-2 w-2">
@@ -184,17 +217,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
           <div className="w-full flex flex-col items-center animate-scaleIn">
             <div className="relative w-32 h-32">
               <svg className="w-full h-full" viewBox="0 0 100 100">
-                {/* Background circle */}
-                <circle
-                  className="text-slate-200 dark:text-zinc-800"
-                  strokeWidth="10"
-                  stroke="currentColor"
-                  fill="transparent"
-                  r="45"
-                  cx="50"
-                  cy="50"
-                />
-                {/* Progress circle */}
+                <circle className="text-slate-200 dark:text-zinc-800" strokeWidth="10" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
                 <circle
                   className="text-cyan-500"
                   strokeWidth="10"
@@ -244,40 +267,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <StatsCard 
-          title="HOY" 
-          value={`$${stats.todayTotal}`} 
-          icon={<Zap size={24} />}
-        />
-        <StatsCard 
-          title="ESTE MES" 
-          value={`$${stats.monthTotal}`} 
-          color="text-emerald-600 dark:text-emerald-400"
-          icon={<Calendar size={24} />}
-        />
-        <StatsCard 
-          title="TOTAL AÑO" 
-          value={`$${stats.allTotal}`} 
-          color="text-violet-600 dark:text-violet-400"
-          icon={<DollarSign size={24} />}
-        />
-         <StatsCard 
-          title="ACTIVIDADES" 
-          value={records.length} 
-          color="text-amber-600 dark:text-amber-400"
-          icon={<Activity size={24} />}
-        />
-        <StatsCard 
-          title="SERVICIOS" 
-          value={stats.countByType[InstallType.SERVICE]} 
-          color="text-amber-600 dark:text-amber-400"
-          icon={<Wrench size={24} />}
-        />
+        <StatsCard title="HOY" value={`$${stats.todayTotal}`} icon={<Zap size={24} />} />
+        <StatsCard title="ESTE MES" value={`$${stats.monthTotal}`} color="text-emerald-600 dark:text-emerald-400" icon={<Calendar size={24} />} />
+        <StatsCard title="TOTAL AÑO" value={`$${stats.allTotal}`} color="text-violet-600 dark:text-violet-400" icon={<DollarSign size={24} />} />
+         <StatsCard title="ACTIVIDADES" value={records.length} color="text-amber-600 dark:text-amber-400" icon={<Activity size={24} />} />
       </div>
 
       <div className="glass-panel rounded-3xl p-6">
         <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-6">INGRESOS (7 DÍAS)</h3>
-        <div className="w-full h-56 min-h-[224px]">
+        <div className="w-full h-56 min-h-[224px] relative">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
               <defs>
@@ -290,24 +288,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
                   <stop offset="100%" stopColor="#52525b" stopOpacity={0.4}/>
                 </linearGradient>
               </defs>
-              <XAxis 
-                dataKey="date" 
-                stroke="#94a3b8" 
-                fontSize={12} 
-                tickLine={false} 
-                axisLine={false} 
-                dy={10}
-              />
+              <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} dy={10} />
               <Tooltip 
                 cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                contentStyle={{ 
-                  backgroundColor: 'rgba(9, 9, 11, 0.8)', 
-                  backdropFilter: 'blur(10px)',
-                  borderColor: 'rgba(255,255,255,0.1)', 
-                  color: '#fff',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
-                }}
+                contentStyle={{ backgroundColor: 'rgba(9, 9, 11, 0.8)', backdropFilter: 'blur(10px)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '12px' }}
                 itemStyle={{ color: '#fff' }}
               />
               <Bar dataKey="amount" radius={[6, 6, 6, 6]} barSize={32}>
@@ -325,33 +309,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
 
       <div className="glass-panel rounded-3xl p-6 flex flex-col items-center">
          <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-2 self-start">DISTRIBUCIÓN</h3>
-         <div className="w-full h-56 min-h-[224px]">
+         <div className="w-full h-56 min-h-[224px] relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={8}
-                  dataKey="value"
-                  cornerRadius={6}
-                  stroke="none"
-                >
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={8} dataKey="value" cornerRadius={6} stroke="none">
                   {pieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(9, 9, 11, 0.8)', 
-                    backdropFilter: 'blur(10px)',
-                    borderColor: 'rgba(255,255,255,0.1)', 
-                    color: '#fff',
-                    borderRadius: '12px'
-                  }} 
-                />
+                <Tooltip contentStyle={{ backgroundColor: 'rgba(9, 9, 11, 0.8)', backdropFilter: 'blur(10px)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '12px' }} />
               </PieChart>
             </ResponsiveContainer>
          </div>

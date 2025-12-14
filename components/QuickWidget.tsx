@@ -15,6 +15,11 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
   if (!isOpen) return null;
 
   const handlePress = (type: InstallType) => {
+    // Haptic Feedback for mobile
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+    
     setClickedType(type);
     
     setTimeout(() => {

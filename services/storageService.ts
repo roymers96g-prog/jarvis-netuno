@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { InstallationRecord, InstallType } from '../types';
-import { APP_STORAGE_KEY } from '../constants';
+import { APP_STORAGE_KEY, LABELS } from '../constants';
 import { getPrice } from './settingsService';
 
 // CONFIGURACIÓN SUPABASE
@@ -33,7 +33,7 @@ export const checkBackendStatus = async (): Promise<'connected' | 'disconnected'
 };
 
 export const getRecords = async (): Promise<InstallationRecord[]> => {
-  // 1. CARGA LOCAL INMEDIATA (Siempre tenemos esto disponible)
+  // 1. CARGA LOCAL INMEDIATA
   const localStr = localStorage.getItem(APP_STORAGE_KEY);
   let localData: InstallationRecord[] = localStr ? JSON.parse(localStr) : [];
 
@@ -45,7 +45,6 @@ export const getRecords = async (): Promise<InstallationRecord[]> => {
 
   // 3. SI ESTAMOS ONLINE, INICIAMOS SINCRONIZACIÓN INTELIGENTE
   try {
-    // A. Obtener datos de la Nube
     const { data: remoteRaw, error } = await supabase
       .from(TABLE_NAME)
       .select('*')
@@ -53,7 +52,6 @@ export const getRecords = async (): Promise<InstallationRecord[]> => {
 
     if (error) throw error;
 
-    // Normalizar datos remotos
     const remoteData: InstallationRecord[] = remoteRaw.map(d => ({
       id: d.id,
       type: d.type as InstallType,
@@ -63,33 +61,23 @@ export const getRecords = async (): Promise<InstallationRecord[]> => {
     }));
 
     // B. Lógica de Fusión (Merge & Sync)
-    
-    // Identificar registros que están en LOCAL pero NO en NUBE (Creados offline)
     const remoteIds = new Set(remoteData.map(r => r.id));
     const pendingUploads = localData.filter(local => !remoteIds.has(local.id));
 
     if (pendingUploads.length > 0) {
       console.log(`☁️ Sincronizando: Subiendo ${pendingUploads.length} registros offline a la nube...`);
-      
-      // Subir los pendientes a Supabase
       const { error: uploadError } = await supabase.from(TABLE_NAME).insert(pendingUploads);
       
       if (uploadError) {
         console.error("Error subiendo datos pendientes:", uploadError);
-        // Si falla la subida, retornamos una mezcla en memoria para no perder visualmente los datos
-        // aunque la nube siga desactualizada hasta el próximo intento.
         return [...remoteData, ...pendingUploads].sort((a, b) => a.timestamp - b.timestamp);
       } else {
         console.log("✅ Subida completada.");
-        // Añadimos los subidos a nuestra lista remota (ya que ahora están en la nube)
         remoteData.push(...pendingUploads);
       }
     }
 
-    // C. Actualizar LocalStorage con la verdad absoluta (Nube + Recién Subidos)
-    // Esto maneja implícitamente la descarga de datos creados en otros dispositivos
     remoteData.sort((a, b) => a.timestamp - b.timestamp);
-    
     localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(remoteData));
     
     return remoteData;
@@ -101,7 +89,6 @@ export const getRecords = async (): Promise<InstallationRecord[]> => {
 };
 
 export const saveRecord = async (type: InstallType, quantity: number, dateOverride?: string): Promise<InstallationRecord[]> => {
-  // Cálculo de fecha y precio
   let dateObj: Date;
 
   if (dateOverride) {
@@ -128,13 +115,10 @@ export const saveRecord = async (type: InstallType, quantity: number, dateOverri
     });
   }
 
-  // 1. INTENTO DE GUARDADO EN SUPABASE
   if (navigator.onLine) {
     try {
       const { error } = await supabase.from(TABLE_NAME).insert(newRecords);
-      
       if (!error) {
-        // Si guardó bien en nube, hacemos un sync completo para asegurar consistencia
         return await getRecords();
       }
       console.error("Error insertando en Supabase, guardando localmente:", error);
@@ -143,7 +127,6 @@ export const saveRecord = async (type: InstallType, quantity: number, dateOverri
     }
   }
 
-  // 2. GUARDADO LOCAL (Fallback)
   console.log("Guardando localmente (pendiente de sync).");
   const currentRecordsString = localStorage.getItem(APP_STORAGE_KEY);
   const currentRecords = currentRecordsString ? JSON.parse(currentRecordsString) : [];
@@ -156,7 +139,6 @@ export const saveRecord = async (type: InstallType, quantity: number, dateOverri
 };
 
 export const deleteRecord = async (id: string): Promise<InstallationRecord[]> => {
-  // 1. INTENTO DE BORRADO EN SUPABASE
   if (navigator.onLine) {
     try {
       const { error } = await supabase.from(TABLE_NAME).delete().eq('id', id);
@@ -169,7 +151,6 @@ export const deleteRecord = async (id: string): Promise<InstallationRecord[]> =>
     }
   }
 
-  // 2. BORRADO LOCAL
   console.log("Borrando localmente.");
   const currentRecordsString = localStorage.getItem(APP_STORAGE_KEY);
   const currentRecords: InstallationRecord[] = currentRecordsString ? JSON.parse(currentRecordsString) : [];
@@ -187,6 +168,28 @@ export const clearAllData = () => {
 export const exportBackupData = (): string => {
   const data = localStorage.getItem(APP_STORAGE_KEY);
   return data || "[]";
+};
+
+// NUEVA FUNCIÓN: Exportar a CSV para Excel
+export const generateCSV = (): string => {
+  const data = localStorage.getItem(APP_STORAGE_KEY);
+  if (!data) return '';
+  
+  const records: InstallationRecord[] = JSON.parse(data);
+  // Header
+  let csvContent = "Fecha,Hora,Tipo,Monto,ID\n";
+  
+  records.forEach(r => {
+    const dateObj = new Date(r.date);
+    const date = dateObj.toLocaleDateString('es-ES');
+    const time = dateObj.toLocaleTimeString('es-ES');
+    const typeLabel = LABELS[r.type] || r.type;
+    
+    // Escapar comillas si fuera necesario y formatear línea
+    csvContent += `${date},${time},"${typeLabel}",${r.amount},${r.id}\n`;
+  });
+  
+  return csvContent;
 };
 
 export const importBackupData = (jsonString: string): boolean => {

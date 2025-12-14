@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, InstallType } from '../types';
 import { LABELS } from '../constants';
-import { exportBackupData, importBackupData } from '../services/storageService';
+import { exportBackupData, importBackupData, generateCSV } from '../services/storageService';
 import { validateApiKey } from '../services/geminiService';
-// FIX: Import `getEffectiveApiKey` to resolve "Cannot find name" error.
 import { getEffectiveApiKey } from '../services/settingsService';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target } from 'lucide-react';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -19,7 +18,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check input validity visually
   useEffect(() => {
     const key = localSettings.apiKey?.trim() || getEffectiveApiKey();
     if (key && key.length > 20) {
@@ -30,7 +28,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   }, [localSettings.apiKey]);
 
   useEffect(() => {
-    // Load voices
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
       const spanishVoices = voices.filter(v => v.lang.startsWith('es'));
@@ -69,7 +66,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     if (!key) return;
 
     setApiKeyStatus('validating');
-    onSave(localSettings); // Save first so service can use it
+    onSave(localSettings); 
     
     const isValid = await validateApiKey(key);
     if (isValid) {
@@ -110,7 +107,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     }
   };
 
-  const handleExport = () => {
+  const handleExportJSON = () => {
     const dataStr = exportBackupData();
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const exportFileDefaultName = `netuno_backup_${new Date().toISOString().slice(0,10)}.json`;
@@ -118,6 +115,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
+  };
+
+  const handleExportCSV = () => {
+    const csvContent = generateCSV();
+    if (!csvContent) {
+      alert("No hay datos para exportar.");
+      return;
+    }
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `reporte_netuno_${new Date().toISOString().slice(0,10)}.csv`);
+    link.click();
   };
 
   const handleImportClick = () => {
@@ -348,37 +359,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
         </div>
       </section>
 
-      {/* Backup Section */}
+      {/* Data Management Section (Export/Import) */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">SEGURIDAD DE DATOS</h3>
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">GESTIÓN DE DATOS</h3>
+        
+        {/* Export Options */}
         <div className="grid grid-cols-2 gap-3">
-          <button 
-            onClick={handleExport}
-            className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-emerald-50/10 transition-colors group"
-          >
-            <Download size={24} className="text-emerald-500 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-bold dark:text-zinc-300 text-slate-600">Exportar Datos</span>
-          </button>
+            <button 
+              onClick={handleExportCSV}
+              className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-emerald-50/10 transition-colors group"
+            >
+              <FileSpreadsheet size={24} className="text-emerald-600 group-hover:scale-110 transition-transform" />
+              <div className="text-center">
+                <span className="block text-xs font-bold dark:text-zinc-300 text-slate-600">Reporte Excel</span>
+                <span className="text-[9px] text-slate-400">Formato CSV legible</span>
+              </div>
+            </button>
 
-          <button 
-            onClick={handleImportClick}
-            className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-blue-50/10 transition-colors group"
-          >
-            <Upload size={24} className="text-blue-500 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-bold dark:text-zinc-300 text-slate-600">Restaurar Copia</span>
-          </button>
-          
-          <input 
-            type="file" 
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".json"
-            className="hidden" 
-          />
+            <button 
+              onClick={handleExportJSON}
+              className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-blue-50/10 transition-colors group"
+            >
+              <Download size={24} className="text-blue-500 group-hover:scale-110 transition-transform" />
+              <div className="text-center">
+                <span className="block text-xs font-bold dark:text-zinc-300 text-slate-600">Backup Completo</span>
+                <span className="text-[9px] text-slate-400">Archivo JSON técnico</span>
+              </div>
+            </button>
         </div>
-        <p className="text-[10px] text-center text-slate-400 dark:text-zinc-600 px-4">
-          Descarga un archivo .JSON para guardar tus registros o cárgalo en otro dispositivo.
-        </p>
+
+        {/* Import Option */}
+        <button 
+          onClick={handleImportClick}
+          className="w-full flex items-center justify-center gap-2 p-3 mt-2 glass-panel rounded-xl hover:bg-white/5 transition-colors border-dashed border-slate-400/30"
+        >
+          <Upload size={16} className="text-slate-400" />
+          <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Restaurar copia de seguridad (JSON)</span>
+        </button>
+        
+        <input 
+          type="file" 
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept=".json"
+          className="hidden" 
+        />
       </section>
 
       {/* Price Settings */}
