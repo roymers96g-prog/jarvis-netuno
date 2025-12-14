@@ -1,22 +1,16 @@
 export enum InstallType {
-  RESIDENTIAL = 'residencial',
-  CORPORATE = 'corporativo',
-  POSTE = 'poste',
-  SERVICE = 'servicio_tecnico'
+  RESIDENTIAL = 'RESIDENTIAL',
+  CORPORATE = 'CORPORATE',
+  POSTE = 'POSTE',
+  SERVICE = 'SERVICE'
 }
 
-export interface ProductionRecord {
+export interface InstallationRecord {
   id: string;
-  user_id: string;
-  installation_type: InstallType;
-  quantity: number | null;
-  unit_price: number | null;
-  total_amount: number;
-  record_date: string; // ISO String from DB
-  created_at: string; // from DB
-  notes: string | null;
-  description: string | null;
-  manual_amount: number | null;
+  type: InstallType;
+  date: string; // ISO String
+  amount: number;
+  timestamp: number;
 }
 
 export interface ChatMessage {
@@ -26,19 +20,21 @@ export interface ChatMessage {
   isProcessing?: boolean;
 }
 
+export interface ProductionStats {
+  totalEarnings: number;
+  countResidential: number;
+  countCorporate: number;
+  countPoste: number;
+}
+
 // Gemini Response Schema Structure
 export interface ExtractedData {
-  intent: 'LOGGING' | 'QUERY' | 'CORRECTION' | 'GENERAL_CHAT';
+  intent: 'LOGGING' | 'QUERY' | 'GENERAL_CHAT';
   records: Array<{
-    type: InstallType;
-    quantity?: number;
+    type: string; // Will map to InstallType
+    quantity: number;
     date?: string; // Optional override, defaults to today
-    description?: string;
-    manual_amount?: number;
   }>;
-  correction?: {
-    new_quantity: number;
-  };
   jarvisResponse: string;
 }
 

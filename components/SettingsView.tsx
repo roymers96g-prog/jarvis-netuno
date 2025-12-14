@@ -3,9 +3,9 @@ import { AppSettings, InstallType } from '../types';
 import { LABELS } from '../constants';
 import { exportBackupData, importBackupData } from '../services/storageService';
 import { validateApiKey } from '../services/geminiService';
+// FIX: Import `getEffectiveApiKey` to resolve "Cannot find name" error.
 import { getEffectiveApiKey } from '../services/settingsService';
-import { supabase } from '../services/supabaseClient';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, LogOut } from 'lucide-react';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -145,10 +145,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     event.target.value = '';
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
-
   return (
     <div className="space-y-8 animate-fadeIn">
       <header className="flex flex-col gap-2 pb-4">
@@ -232,13 +228,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
              className="w-32 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-medium text-sm dark:text-white text-slate-900"
           />
         </div>
-        <button 
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 py-3 glass-panel border-dashed border-red-500/30 dark:border-red-500/30 rounded-2xl text-red-600 dark:text-red-500 hover:bg-red-500/10 dark:hover:bg-red-500/10 transition-colors"
-       >
-         <LogOut size={16} />
-         <span className="font-bold text-sm">Cerrar Sesión</span>
-       </button>
       </section>
       
       {/* Goal Section */}
@@ -316,7 +305,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
                     />
                   </div>
                   <div className="space-y-1">
-                    {/* Fix: Access `rate` via `voiceSettings` object. */}
                     <label className="text-xs font-bold text-slate-500 dark:text-zinc-400">Velocidad: {localSettings.voiceSettings.rate}</label>
                     <input 
                       type="range" min="0.5" max="2" step="0.1"
