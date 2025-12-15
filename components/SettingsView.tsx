@@ -6,7 +6,7 @@ import { exportBackupData, importBackupData, generateCSV, wipeUserData } from '.
 import { validateApiKey } from '../services/geminiService';
 import { getEffectiveApiKey } from '../services/settingsService';
 import { ConfirmationModal } from './ConfirmationModal';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet, HardHat, Wrench, Trash2, AlertTriangle } from 'lucide-react';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet, HardHat, Wrench, Trash2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -18,6 +18,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const [isSaved, setIsSaved] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing' | 'validating'>('checking');
   const [apiErrorMsg, setApiErrorMsg] = useState<string>('');
+  const [showApiKey, setShowApiKey] = useState(false); // Estado para visibilidad
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showWipeModal, setShowWipeModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +26,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   useEffect(() => {
     const key = localSettings.apiKey?.trim() || getEffectiveApiKey();
     if (key && key.length > 20) {
-      // Si ya estaba ok, lo dejamos visualmente ok hasta que el usuario intente validar de nuevo
       if (apiKeyStatus !== 'validating' && apiKeyStatus !== 'ok' && !apiErrorMsg) setApiKeyStatus('checking'); 
     } else {
       setApiKeyStatus('missing');
@@ -61,13 +61,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   };
 
   const handleSave = () => {
-    onSave(localSettings);
+    // Limpieza de seguridad al guardar: quitar espacios
+    const cleanSettings = {
+        ...localSettings,
+        apiKey: localSettings.apiKey.trim().replace(/[\r\n\s]/g, '')
+    };
+    onSave(cleanSettings);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };
 
   const handleTestApiKey = async () => {
-    const key = localSettings.apiKey?.trim();
+    // Limpieza agresiva antes de validar
+    const rawKey = localSettings.apiKey || "";
+    const key = rawKey.trim().replace(/[\r\n\s]/g, ''); // Quita espacios y enters
+    
+    // Actualizamos el estado local con la llave limpia para que el usuario lo vea corregido
+    if (key !== rawKey) {
+        setLocalSettings(p => ({ ...p, apiKey: key }));
+    }
+
     if (!key) {
       alert("Por favor ingresa una API Key primero.");
       return;
@@ -76,8 +89,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     setApiKeyStatus('validating');
     setApiErrorMsg('');
     
-    // Guardamos temporalmente para que el validador use esta key
-    onSave(localSettings); 
+    // Guardamos temporalmente
+    onSave({ ...localSettings, apiKey: key }); 
     
     const result = await validateApiKey(key);
     
@@ -88,7 +101,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     } else {
       setApiKeyStatus('missing');
       setApiErrorMsg(result.error || "Error desconocido");
-      // Mostrar alerta con el error detallado
       alert(result.error || "Error al conectar con Gemini");
     }
   };
@@ -220,16 +232,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
           </div>
 
           <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-3 mb-3">
-            <label className="text-xs font-bold text-slate-500 dark:text-zinc-400 mb-2 block flex items-center gap-2">
-              <Key size={12} /> Google Gemini API Key
-            </label>
+            <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-2">
+                    <Key size={12} /> Google Gemini API Key
+                </label>
+                <button 
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="text-cyan-600 dark:text-cyan-400 text-xs font-bold flex items-center gap-1 hover:opacity-80"
+                >
+                    {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {showApiKey ? 'Ocultar' : 'Ver Llave'}
+                </button>
+            </div>
+            
             <input 
-              type="password"
+              type={showApiKey ? "text" : "password"}
               value={localSettings.apiKey}
               onChange={(e) => setLocalSettings(p => ({ ...p, apiKey: e.target.value }))}
               placeholder={getEffectiveApiKey() ? "Usando variable de entorno (Oculta)" : "Pega tu llave aquí..."}
-              className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-sm dark:text-white text-slate-900 pb-2 placeholder:text-slate-400 font-mono"
+              className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-sm dark:text-white text-slate-900 pb-2 placeholder:text-slate-400 font-mono tracking-tight"
             />
+            
             {apiErrorMsg && (
               <div className="flex items-start gap-2 mt-2 bg-red-500/10 p-2 rounded text-[11px] text-red-600 dark:text-red-400 font-bold border border-red-500/20">
                  <AlertTriangle size={14} className="min-w-[14px] mt-0.5" />

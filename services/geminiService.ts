@@ -116,42 +116,54 @@ export const resetChat = () => {
 };
 
 // Function to test the API Key specifically
-export const validateApiKey = async (apiKey: string): Promise<{valid: boolean; error?: string}> => {
-  if (!apiKey || apiKey.trim().length < 30) {
-      return { valid: false, error: "⚠️ Formato inválido: La Key es demasiado corta." };
+export const validateApiKey = async (rawApiKey: string): Promise<{valid: boolean; error?: string}> => {
+  // 1. Limpieza Agresiva: Elimina espacios, tabs y saltos de línea que suelen colarse al copiar en móviles
+  const apiKey = rawApiKey ? rawApiKey.trim().replace(/[\r\n\s]/g, '') : '';
+
+  if (!apiKey || apiKey.length < 30) {
+      return { valid: false, error: "⚠️ La Key parece incompleta o demasiado corta." };
   }
 
-  try {
+  const testModel = async (modelName: string) => {
     const testAI = new GoogleGenAI({ apiKey });
-    // Usamos un prompt mínimo para probar conectividad
     await testAI.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: modelName,
       contents: "Hi",
     });
+  };
+
+  try {
+    // Intentar primero con el modelo 2.5 (más rápido/barato/inteligente)
+    await testModel("gemini-2.5-flash");
     return { valid: true };
   } catch (e: any) {
-    console.error("Validation failed detail:", e);
+    console.warn("Fallo validación con gemini-2.5-flash, intentando fallback...", e.message);
     
-    let msg = "Error desconocido al conectar con Gemini.";
-    const errString = e.toString().toLowerCase();
-    const errMsg = e.message?.toLowerCase() || "";
+    // Si falla, intentar con 1.5 (por si la llave no tiene acceso a 2.5 en esa región o proyecto)
+    try {
+        await testModel("gemini-1.5-flash");
+        return { valid: true };
+    } catch (e2: any) {
+        console.error("Validation failed completely:", e2);
+        
+        let msg = "Error desconocido al conectar con Gemini.";
+        const errString = e2.toString().toLowerCase();
+        const errMsg = e2.message?.toLowerCase() || "";
 
-    // Clasificación de errores comunes de la API de Google
-    if (errMsg.includes('key') || errMsg.includes('403') || errString.includes('permission_denied') || errMsg.includes('api key not valid')) {
-        msg = "⛔ API Key rechazada. Verifica que la has copiado correctamente de Google AI Studio.";
-    } else if (errMsg.includes('not found') || errMsg.includes('404')) {
-        msg = "🔍 Modelo no encontrado. Tu Key podría no tener acceso a 'gemini-2.5-flash'.";
-    } else if (errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('failed to fetch')) {
-        msg = "📡 Error de conexión. Revisa tu internet o firewall.";
-    } else if (errMsg.includes('quota') || errMsg.includes('429') || errMsg.includes('exhausted')) {
-        msg = "⏳ Cuota excedida. Has superado el límite gratuito de solicitudes a Gemini por hoy.";
-    } else if (errMsg.includes('location') || errMsg.includes('region') || errMsg.includes('unsupported location')) {
-        msg = "🌍 Ubicación no soportada. La API no está disponible en tu región/IP actual.";
-    } else if (errMsg.includes('load failed')) {
-        msg = "📱 Error de red del dispositivo. Intenta desactivar el Wi-Fi o usar datos.";
+        if (errMsg.includes('key') || errMsg.includes('403') || errString.includes('permission_denied') || errMsg.includes('api key not valid')) {
+            msg = "⛔ API Key rechazada. Verifica que la has copiado correctamente (sin espacios al final).";
+        } else if (errMsg.includes('not found') || errMsg.includes('404')) {
+            msg = "🔍 Modelo no encontrado o Key no válida para este modelo.";
+        } else if (errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('failed to fetch')) {
+            msg = "📡 Error de conexión. Revisa tu internet.";
+        } else if (errMsg.includes('quota') || errMsg.includes('429')) {
+            msg = "⏳ Cuota excedida por hoy.";
+        } else if (errMsg.includes('location') || errMsg.includes('region')) {
+            msg = "🌍 Ubicación no soportada por Google AI.";
+        }
+
+        return { valid: false, error: msg };
     }
-
-    return { valid: false, error: msg };
   }
 };
 
