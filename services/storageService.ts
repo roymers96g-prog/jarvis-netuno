@@ -4,11 +4,21 @@ import { APP_STORAGE_KEY, LABELS } from '../constants';
 import { getPrice } from './settingsService';
 
 // CONFIGURACIÓN SUPABASE
-const SUPABASE_URL = "https://mgyfqbdnpysbxvhznwrx.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1neWZxYmRucHlzYnh2aHpud3J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NTA0NTIsImV4cCI6MjA4MTIyNjQ1Mn0.PlcQtx6TL0OYtwBuzDq94wxBKOW6DUp8gJMPrZkT35o";
+// Usamos import.meta.env nativo de Vite.
+// Acceso seguro: (import.meta as any).env evita errores de TS y verificamos existencia.
+const getEnv = (key: string) => {
+  try {
+    return (import.meta as any).env?.[key] || "";
+  } catch (e) {
+    return "";
+  }
+};
+
+const SUPABASE_URL = getEnv('VITE_SUPABASE_URL');
+const SUPABASE_KEY = getEnv('VITE_SUPABASE_ANON_KEY');
 
 // Inicializar cliente
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_KEY || 'placeholder');
 
 // Nombre de la tabla en Supabase
 const TABLE_NAME = 'installations';
@@ -18,6 +28,7 @@ const simulateNetwork = () => new Promise(resolve => setTimeout(resolve, 50));
 
 export const checkBackendStatus = async (): Promise<'connected' | 'disconnected' | 'disabled'> => {
   if (!navigator.onLine) return 'disconnected';
+  if (!SUPABASE_URL || !SUPABASE_KEY) return 'disabled';
   
   try {
     const { error } = await supabase.from(TABLE_NAME).select('id', { count: 'exact', head: true });
@@ -45,6 +56,8 @@ export const getRecords = async (): Promise<InstallationRecord[]> => {
 
   // 3. SI ESTAMOS ONLINE, INICIAMOS SINCRONIZACIÓN INTELIGENTE
   try {
+    if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error("Supabase credentials missing");
+
     const { data: remoteRaw, error } = await supabase
       .from(TABLE_NAME)
       .select('*')
@@ -115,7 +128,7 @@ export const saveRecord = async (type: InstallType, quantity: number, dateOverri
     });
   }
 
-  if (navigator.onLine) {
+  if (navigator.onLine && SUPABASE_URL && SUPABASE_KEY) {
     try {
       const { error } = await supabase.from(TABLE_NAME).insert(newRecords);
       if (!error) {
@@ -139,7 +152,7 @@ export const saveRecord = async (type: InstallType, quantity: number, dateOverri
 };
 
 export const deleteRecord = async (id: string): Promise<InstallationRecord[]> => {
-  if (navigator.onLine) {
+  if (navigator.onLine && SUPABASE_URL && SUPABASE_KEY) {
     try {
       const { error } = await supabase.from(TABLE_NAME).delete().eq('id', id);
       if (!error) {

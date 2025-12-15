@@ -71,7 +71,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     
     // Get unique dates sorted descending
     // Explicitly type as string[] to satisfy TypeScript compiler
-    const uniqueDates: string[] = Array.from(new Set(records.map(r => new Date(r.date).toLocaleDateString('en-CA')))).sort().reverse();
+    const uniqueDates: string[] = Array.from<string>(new Set(records.map(r => new Date(r.date).toLocaleDateString('en-CA')))).sort().reverse();
     
     if (uniqueDates.length === 0) return 0;
 

@@ -97,26 +97,11 @@
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
     <script>
-      // Force SW update check
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Changed to relative path ./sw.js to avoid origin issues
-          navigator.serviceWorker.register('./sw.js?v=7.1')
-            .then(reg => {
-              reg.onupdatefound = () => {
-                const installingWorker = reg.installing;
-                installingWorker.onstatechange = () => {
-                  if (installingWorker.state === 'installed') {
-                    if (navigator.serviceWorker.controller) {
-                      console.log('New content available; please refresh.');
-                    } else {
-                      console.log('Content is cached for offline use.');
-                    }
-                  }
-                };
-              };
-            })
-            .catch(err => console.error('SW Registration Fail', err));
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW registered'))
+            .catch(err => console.log('SW registration failed: ', err));
         });
       }
     </script>
