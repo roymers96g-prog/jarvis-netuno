@@ -1,21 +1,36 @@
+
 import { AppSettings, InstallType } from '../types';
 import { DEFAULT_PRICES, SETTINGS_STORAGE_KEY } from '../constants';
 
 // Declare process for TS
 declare var process: any;
 
+const USER_ID_KEY = 'netuno_device_user_id';
+
 const DEFAULT_SETTINGS: AppSettings = {
-  nickname: '', // Empty by default forces the user to set it
-  apiKey: '',   // Empty by default
+  nickname: '', 
+  profile: 'INSTALLER', // Default profile
+  apiKey: '',   
   ttsEnabled: true,
   theme: 'dark',
   monthlyGoal: 0,
   customPrices: { ...DEFAULT_PRICES },
   voiceSettings: {
-    voiceURI: '', // Auto-select logic will handle empty string
-    pitch: 0.8, // Deep tone (Crucial for Jarvis)
-    rate: 1.1   // Efficient speed (Crucial for AI feel)
+    voiceURI: '', 
+    pitch: 0.8, 
+    rate: 1.1   
   }
+};
+
+// Genera o recupera un ID único para este usuario/dispositivo
+// Esto permite filtrar los datos en Supabase para que no se mezclen con otros usuarios
+export const getUserId = (): string => {
+  let userId = localStorage.getItem(USER_ID_KEY);
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem(USER_ID_KEY, userId);
+  }
+  return userId;
 };
 
 export const getSettings = (): AppSettings => {
@@ -24,7 +39,7 @@ export const getSettings = (): AppSettings => {
     if (!data) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(data);
     
-    // Robust merge to ensure nested objects like voiceSettings exist
+    // Robust merge to ensure nested objects like voiceSettings and customPrices exist
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,

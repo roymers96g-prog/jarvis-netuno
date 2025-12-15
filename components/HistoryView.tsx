@@ -1,6 +1,8 @@
+
 import React, { useMemo, useState } from 'react';
 import { InstallationRecord, InstallType } from '../types';
-import { Trash2, Search, Calendar, Filter } from 'lucide-react';
+import { Trash2, Filter, History } from 'lucide-react';
+import { LABELS } from '../constants';
 
 interface HistoryViewProps {
   records: InstallationRecord[];
@@ -22,7 +24,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onDelete }) =
     <div className="space-y-6 animate-fadeIn">
       <header className="flex flex-col gap-2 pb-2">
         <h2 className="text-xl font-bold dark:text-white text-slate-800 tracking-wide flex items-center gap-2">
-          <Calendar className="text-cyan-600 dark:text-zinc-400" size={24} />
+          <History className="text-cyan-600 dark:text-zinc-400" size={24} />
           HISTORIAL
         </h2>
         <p className="text-slate-500 dark:text-zinc-500 text-sm">Registro completo de actividades.</p>
@@ -40,6 +42,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onDelete }) =
         >
           TODOS
         </button>
+        {/* Generamos botones de filtro dinámicamente o estáticos para los más comunes */}
         <button 
           onClick={() => setFilterType(InstallType.RESIDENTIAL)}
           className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${
@@ -71,14 +74,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onDelete }) =
           POSTE
         </button>
         <button 
-          onClick={() => setFilterType(InstallType.SERVICE)}
+          onClick={() => setFilterType(InstallType.SERVICE_BASIC)}
           className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${
-            filterType === InstallType.SERVICE
-              ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700' 
+            filterType === InstallType.SERVICE_BASIC
+              ? 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700' 
               : 'glass-panel text-slate-500 dark:text-zinc-500'
           }`}
         >
-          SERVICIO
+          SRV. BÁSICO
         </button>
       </div>
 
@@ -103,16 +106,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onDelete }) =
                   <span className={`w-2 h-2 rounded-full ${
                      rec.type === InstallType.RESIDENTIAL ? 'bg-cyan-400' :
                      rec.type === InstallType.CORPORATE ? 'bg-violet-400' :
-                     rec.type === InstallType.SERVICE ? 'bg-amber-400' :
-                     'bg-emerald-400'
+                     rec.type === InstallType.POSTE ? 'bg-emerald-400' :
+                     rec.type === InstallType.SERVICE_BASIC ? 'bg-orange-400' :
+                     rec.type === InstallType.SERVICE_REWIRING ? 'bg-pink-400' :
+                     'bg-slate-400'
                   }`} />
                   <span className={`text-xs font-bold tracking-wider uppercase ${
                      rec.type === InstallType.RESIDENTIAL ? 'text-cyan-700 dark:text-cyan-300' :
                      rec.type === InstallType.CORPORATE ? 'text-violet-700 dark:text-violet-300' :
-                     rec.type === InstallType.SERVICE ? 'text-amber-700 dark:text-amber-300' :
-                     'text-emerald-700 dark:text-emerald-300'
+                     rec.type === InstallType.POSTE ? 'text-emerald-700 dark:text-emerald-300' :
+                     'text-slate-600 dark:text-slate-300'
                   }`}>
-                    {rec.type === 'SERVICE' ? 'SERVICIO' : rec.type}
+                    {LABELS[rec.type]}
                   </span>
                 </div>
                 <span className="text-xs text-slate-500 dark:text-zinc-500 font-medium">
@@ -124,7 +129,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ records, onDelete }) =
                 <span className="text-lg font-bold dark:text-white text-slate-800">${rec.amount}</span>
                 <button 
                   onClick={() => onDelete(rec.id)}
-                  className="p-2 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                  title="Eliminar Registro"
+                  className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
                 >
                   <Trash2 size={18} />
                 </button>

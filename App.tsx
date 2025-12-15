@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { getRecords, saveRecord, deleteRecord, checkBackendStatus } from './services/storageService';
 import { processUserMessage, resetChat } from './services/geminiService';
@@ -13,9 +14,9 @@ import { NicknameModal } from './components/NicknameModal';
 import { WelcomeTutorial } from './components/WelcomeTutorial';
 import { InstallModal } from './components/InstallModal';
 import { ChatBar } from './components/ChatBar';
-import { InstallationRecord, ChatMessage, ExtractedData, InstallType, AppSettings } from './types';
+import { InstallationRecord, ChatMessage, ExtractedData, InstallType, AppSettings, UserProfile } from './types';
 import { LABELS } from './constants';
-import { Menu, X, Aperture, LayoutGrid, LayoutDashboard, List, Settings as SettingsIcon, Download, Share, Save, BarChart3, ChevronDown, Bot } from 'lucide-react';
+import { Menu, X, Aperture, LayoutGrid, LayoutDashboard, List, Settings as SettingsIcon, Download, Share, Save, BarChart3, ChevronDown, Bot, Maximize2, Minus, Square } from 'lucide-react';
 
 const App: React.FC = () => {
   // State
@@ -48,6 +49,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
+  const [chatMode, setChatMode] = useState<'compact' | 'normal' | 'expanded'>('normal');
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -128,8 +130,10 @@ const App: React.FC = () => {
 
   // Scroll to bottom of chat
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isMenuOpen, isWidgetOpen, isChatOpen]); // Added isChatOpen dep
+    if (chatMode !== 'compact') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isMenuOpen, isWidgetOpen, isChatOpen, chatMode]);
 
   const triggerSuccessEffect = () => {
     setShowSuccessFlash(true);
@@ -185,10 +189,14 @@ const App: React.FC = () => {
     }
     setSettings(newSettings);
     saveSettings(newSettings);
+    // Important: Reset Chat also when profile changes to update system prompt context
+    if (settings.profile !== newSettings.profile) {
+       resetChat();
+    }
   };
 
-  const handleSaveNickname = (name: string) => {
-    const newSettings = { ...settings, nickname: name };
+  const handleSaveNickname = (name: string, profile: UserProfile) => {
+    const newSettings = { ...settings, nickname: name, profile: profile };
     setSettings(newSettings);
     saveSettings(newSettings);
     setIsNicknameModalOpen(false);
@@ -232,6 +240,9 @@ const App: React.FC = () => {
   // ASYNC: Handle User Input
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
+
+    // If chat is compacted, open to normal so user sees the flow
+    if (chatMode === 'compact') setChatMode('normal');
 
     const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text };
     setMessages(prev => [...prev, userMsg]);
@@ -289,6 +300,17 @@ const App: React.FC = () => {
 
   // Logic to determine if chat is effectively hidden by view routing
   const isViewHidingChat = currentView === 'settings' || currentView === 'analysis';
+  
+  // Calculate chat container class based on mode
+  const getChatHeightClass = () => {
+    switch(chatMode) {
+      case 'compact': return 'h-0 overflow-hidden py-0';
+      case 'expanded': return 'h-[60vh] overflow-y-auto px-4 pt-4 pb-2 space-y-3';
+      case 'normal': default: return 'max-h-64 overflow-y-auto px-4 pt-4 pb-2 space-y-3';
+    }
+  };
+
+  const messagesToShow = chatMode === 'expanded' ? messages : messages.slice(-4);
 
   return (
     <div className="min-h-screen dark:bg-zinc-950 bg-slate-100 dark:text-zinc-100 text-slate-800 font-rajdhani relative overflow-hidden transition-colors duration-500">
@@ -412,19 +434,54 @@ const App: React.FC = () => {
       {/* Sticky Chat Interface */}
       <div className={`fixed bottom-0 w-full z-40 glass-panel border-t transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${isViewHidingChat || !isChatOpen ? 'translate-y-full' : 'translate-y-0'}`}>
         
-        {/* Minimize Handle */}
-        <div className="absolute -top-5 left-0 right-0 flex justify-center pointer-events-none">
-           <button 
-             onClick={() => setIsChatOpen(false)}
-             className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md border border-white/20 dark:border-white/10 text-slate-500 dark:text-zinc-400 rounded-t-xl px-6 py-1 shadow-lg pointer-events-auto hover:text-cyan-500 transition-colors flex items-center gap-1 text-[10px] font-bold tracking-widest uppercase"
-           >
-             Minimizar <ChevronDown size={14} />
-           </button>
+        {/* Resize Handle / Controls */}
+        <div className="absolute -top-10 left-0 right-0 flex justify-center items-end gap-2 pointer-events-none px-4">
+           {/* Size Toggles */}
+           <div className="flex bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-t-xl shadow-lg pointer-events-auto overflow-hidden">
+             
+             {/* Compact Mode (Only Input) */}
+             <button 
+               onClick={() => setChatMode('compact')}
+               className={`p-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${chatMode === 'compact' ? 'text-cyan-500' : 'text-slate-400 dark:text-zinc-500'}`}
+               title="Vista Compacta"
+             >
+               <Minus size={16} />
+             </button>
+
+             {/* Normal Mode */}
+             <button 
+               onClick={() => setChatMode('normal')}
+               className={`p-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${chatMode === 'normal' ? 'text-cyan-500' : 'text-slate-400 dark:text-zinc-500'}`}
+               title="Vista Normal"
+             >
+               <Square size={14} />
+             </button>
+
+             {/* Expanded Mode */}
+             <button 
+               onClick={() => setChatMode('expanded')}
+               className={`p-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${chatMode === 'expanded' ? 'text-cyan-500' : 'text-slate-400 dark:text-zinc-500'}`}
+               title="Expandir"
+             >
+               <Maximize2 size={14} />
+             </button>
+
+             <div className="w-px bg-slate-200 dark:bg-white/10 mx-1 my-3"></div>
+
+             {/* Close / Minimize */}
+             <button 
+               onClick={() => setIsChatOpen(false)}
+               className="p-3 hover:text-red-500 text-slate-400 dark:text-zinc-500 transition-colors"
+               title="Ocultar"
+             >
+               <ChevronDown size={16} />
+             </button>
+           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto">
-          <div className="max-h-64 overflow-y-auto px-4 pt-4 pb-2 space-y-3">
-            {messages.slice(-4).map((msg) => (
+        <div className="max-w-2xl mx-auto transition-all duration-300">
+          <div className={`${getChatHeightClass()} transition-all duration-300`}>
+            {messagesToShow.map((msg) => (
               <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm backdrop-blur-sm ${msg.sender === 'user' ? 'bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-zinc-700 dark:to-zinc-800 text-white rounded-br-none' : 'bg-white/60 dark:bg-white/10 dark:text-zinc-200 text-slate-800 border border-white/20 dark:border-white/5 rounded-bl-none'}`}>
                   {msg.text}

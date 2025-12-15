@@ -1,12 +1,21 @@
+
 export enum InstallType {
   RESIDENTIAL = 'RESIDENTIAL',
   CORPORATE = 'CORPORATE',
   POSTE = 'POSTE',
-  SERVICE = 'SERVICE'
+  // Legacy Service (kept for backward compatibility or generic use)
+  SERVICE = 'SERVICE',
+  // New Technical Service Types
+  SERVICE_BASIC = 'SERVICE_BASIC',
+  SERVICE_REWIRING = 'SERVICE_REWIRING',
+  SERVICE_CORP = 'SERVICE_CORP'
 }
+
+export type UserProfile = 'INSTALLER' | 'TECHNICIAN';
 
 export interface InstallationRecord {
   id: string;
+  userId?: string; // Nuevo campo para aislar datos por usuario
   type: InstallType;
   date: string; // ISO String
   amount: number;
@@ -46,7 +55,8 @@ export interface VoiceSettings {
 
 export interface AppSettings {
   nickname: string;
-  apiKey: string; // Manual API Key override
+  profile: UserProfile; // New field for app mode
+  apiKey: string; 
   ttsEnabled: boolean;
   theme: 'dark' | 'light';
   monthlyGoal: number;

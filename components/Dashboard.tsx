@@ -1,9 +1,10 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
-import { InstallationRecord, InstallType, AppSettings } from '../types';
+import { InstallationRecord, InstallType, AppSettings, UserProfile } from '../types';
 import { LABELS, COLORS } from '../constants';
 import { StatsCard } from './StatsCard';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { DollarSign, Activity, Calendar, Zap, WifiOff, Settings, Target, Wrench, ServerCrash, CloudOff, Flame } from 'lucide-react';
+import { DollarSign, Activity, Calendar, Zap, WifiOff, Settings, Target, ServerCrash, CloudOff, Flame, Signal } from 'lucide-react';
 
 interface DashboardProps {
   records: InstallationRecord[];
@@ -29,6 +30,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     };
   }, []);
   
+  // Define types relevant to the current profile
+  const relevantTypes = useMemo(() => {
+     if (settings.profile === 'TECHNICIAN') {
+       return [InstallType.SERVICE_BASIC, InstallType.SERVICE_REWIRING, InstallType.SERVICE_CORP];
+     }
+     // Default Installer types (includes generic SERVICE for legacy/mixed use)
+     return [InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE, InstallType.SERVICE];
+  }, [settings.profile]);
+
   const stats = useMemo(() => {
     const now = new Date();
     const todayStr = now.toLocaleDateString('en-CA'); // en-CA gives YYY-MM-DD format
@@ -39,12 +49,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     let todayTotal = 0;
     let allTotal = 0;
     
-    const countByType = {
-      [InstallType.RESIDENTIAL]: 0,
-      [InstallType.CORPORATE]: 0,
-      [InstallType.POSTE]: 0,
-      [InstallType.SERVICE]: 0,
-    };
+    // Initialize count with 0 for ALL known types to avoid undefined
+    const countByType: Record<string, number> = {};
+    Object.values(InstallType).forEach(t => countByType[t] = 0);
 
     records.forEach(r => {
       const rDate = new Date(r.date);
@@ -68,9 +75,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
   // Streak Calculation
   const streak = useMemo(() => {
     if (records.length === 0) return 0;
-    
-    // Get unique dates sorted descending
-    // Explicitly type as string[] to satisfy TypeScript compiler
     const uniqueDates: string[] = Array.from<string>(new Set(records.map(r => new Date(r.date).toLocaleDateString('en-CA')))).sort().reverse();
     
     if (uniqueDates.length === 0) return 0;
@@ -80,8 +84,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toLocaleDateString('en-CA');
 
-    // If no entry today or yesterday, streak is 0 (unless we want to be lenient about today)
-    // Let's assume strict: if last entry wasn't today or yesterday, streak broken.
     if (uniqueDates[0] !== todayStr && uniqueDates[0] !== yesterdayStr) {
       return 0;
     }
@@ -104,12 +106,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     return currentStreak;
   }, [records]);
 
-  const pieData = [
-    { name: LABELS[InstallType.RESIDENTIAL], value: stats.countByType[InstallType.RESIDENTIAL], color: COLORS[InstallType.RESIDENTIAL] },
-    { name: LABELS[InstallType.CORPORATE], value: stats.countByType[InstallType.CORPORATE], color: COLORS[InstallType.CORPORATE] },
-    { name: LABELS[InstallType.POSTE], value: stats.countByType[InstallType.POSTE], color: COLORS[InstallType.POSTE] },
-    { name: LABELS[InstallType.SERVICE], value: stats.countByType[InstallType.SERVICE], color: COLORS[InstallType.SERVICE] },
-  ].filter(d => d.value > 0);
+  // Pie Data filtered by profile relevant types
+  const pieData = relevantTypes
+    .map(type => ({
+      name: LABELS[type],
+      value: stats.countByType[type] || 0,
+      color: COLORS[type]
+    }))
+    .filter(d => d.value > 0);
+
+  // If no specific data found for profile, but there is other data, show "Otros"
+  const otherTypesCount = records.filter(r => !relevantTypes.includes(r.type)).length;
+  if (otherTypesCount > 0 && pieData.length === 0) {
+     pieData.push({ name: 'Otros Registros', value: otherTypesCount, color: '#64748b' });
+  }
 
   const chartData = useMemo(() => {
     const days = 7;
@@ -173,6 +183,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
   };
 
   const status = getStatusConfig();
+  const roleLabel = settings.profile === 'TECHNICIAN' ? 'Servicio Técnico' : 'Instalaciones';
 
   return (
     <div className="space-y-6 pb-24 animate-fadeIn">
@@ -180,7 +191,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
         <div>
           <h2 className="text-2xl font-bold dark:text-white text-slate-800 tracking-tight">Hola, {username || 'Técnico'}</h2>
           <div className="flex items-center gap-2 mt-1">
-             <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium">Panel de Control</p>
+             <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium">{roleLabel}</p>
              {streak > 0 && (
                 <div className="flex items-center gap-1 bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-bold border border-orange-500/20 animate-pulse">
                    <Flame size={10} fill="currentColor" /> {streak} DÍAS
@@ -270,7 +281,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
         <StatsCard title="HOY" value={`$${stats.todayTotal}`} icon={<Zap size={24} />} />
         <StatsCard title="ESTE MES" value={`$${stats.monthTotal}`} color="text-emerald-600 dark:text-emerald-400" icon={<Calendar size={24} />} />
         <StatsCard title="TOTAL AÑO" value={`$${stats.allTotal}`} color="text-violet-600 dark:text-violet-400" icon={<DollarSign size={24} />} />
-         <StatsCard title="ACTIVIDADES" value={records.length} color="text-amber-600 dark:text-amber-400" icon={<Activity size={24} />} />
+         <StatsCard title="ACTIVIDADES" value={records.length} color="text-amber-600 dark:text-amber-400" icon={<Signal size={24} />} />
       </div>
 
       <div className="glass-panel rounded-3xl p-6">
@@ -309,18 +320,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
 
       <div className="glass-panel rounded-3xl p-6 flex flex-col items-center">
          <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-2 self-start">DISTRIBUCIÓN</h3>
-         <div className="w-full h-56 min-h-[224px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={8} dataKey="value" cornerRadius={6} stroke="none">
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: 'rgba(9, 9, 11, 0.8)', backdropFilter: 'blur(10px)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '12px' }} />
-              </PieChart>
-            </ResponsiveContainer>
-         </div>
+         {pieData.length > 0 ? (
+           <div className="w-full h-56 min-h-[224px] relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={8} dataKey="value" cornerRadius={6} stroke="none">
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: 'rgba(9, 9, 11, 0.8)', backdropFilter: 'blur(10px)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '12px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+           </div>
+         ) : (
+           <div className="w-full h-56 flex items-center justify-center text-slate-400 dark:text-zinc-600 text-xs italic">
+             No hay datos de {roleLabel.toLowerCase()}
+           </div>
+         )}
          <div className="flex flex-wrap justify-center gap-2 mt-2 text-xs font-medium">
             {pieData.map(d => (
               <div key={d.name} className="flex items-center gap-1.5 bg-white/50 dark:bg-white/5 px-3 py-1 rounded-full border border-white/20 dark:border-white/5">

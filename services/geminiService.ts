@@ -1,6 +1,7 @@
+
 import { GoogleGenAI, Type, Schema, Chat, GenerateContentResponse } from "@google/genai";
 import { InstallType, InstallationRecord, ExtractedData } from "../types";
-import { getAllPrices, getEffectiveApiKey } from "./settingsService";
+import { getAllPrices, getEffectiveApiKey, getSettings } from "./settingsService";
 
 let ai: GoogleGenAI | null = null;
 let chat: Chat | null = null;
@@ -31,8 +32,11 @@ const RESPONSE_SCHEMA: Schema = {
         properties: {
           type: {
             type: Type.STRING,
-            enum: [InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE, InstallType.SERVICE],
-            description: "El tipo de instalación detectada."
+            enum: [
+              InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE, InstallType.SERVICE,
+              InstallType.SERVICE_BASIC, InstallType.SERVICE_REWIRING, InstallType.SERVICE_CORP
+            ],
+            description: "El tipo de instalación detectada. Usa SERVICE_BASIC, SERVICE_REWIRING, SERVICE_CORP si el contexto es de soporte técnico."
           },
           quantity: {
             type: Type.INTEGER,
@@ -56,23 +60,37 @@ const RESPONSE_SCHEMA: Schema = {
 
 const getSystemInstruction = () => {
     const prices = getAllPrices();
+    const settings = getSettings();
+    const role = settings.profile === 'TECHNICIAN' ? 'Técnico de Servicio' : 'Instalador de Fibra';
+
     return `
       Fecha y Hora Actual del Sistema: ${new Date().toLocaleString('es-ES')}
       
-      Eres Jarvis, un asistente de IA para Netuno. Eres eficiente y directo. Tu función es ayudar al usuario a registrar su producción y responder preguntas sobre ella basándote en el contexto que se te proporciona en cada mensaje.
+      Eres Jarvis, un asistente de IA para Netuno. El usuario tiene el rol de: ${role}.
       
       TAREAS PRINCIPALES:
-      1.  Determina la intención del usuario: LOGGING (registrar datos), QUERY (preguntar sobre datos), o GENERAL_CHAT (saludo, etc.).
-      2.  Si es LOGGING: Extrae instalaciones (Residencial, Corporativa, Poste, Servicio Técnico), cantidad y fecha. Si no hay fecha, usa la actual. Si dice "ayer", resta 1 día. Mantén el contexto de la conversación (ej: "agrega 2 más" se refiere al último tipo). En 'jarvisResponse', confirma la acción y la fecha.
-      3.  Si es QUERY: Usa los "DATOS DE CONTEXTO" que se te proporcionan en el mensaje del usuario para responder de forma concisa. NO inventes datos.
-      4.  Si es GENERAL_CHAT: Responde de forma breve y profesional.
-      5.  Responde SIEMPRE con el JSON schema. 'records' puede ser un array vacío si la intención no es LOGGING.
+      1.  Determina la intención del usuario: LOGGING (registrar datos), QUERY (preguntar sobre datos), o GENERAL_CHAT.
+      2.  LOGGING:
+          - Si el usuario es INSTALADOR, prioriza: Residencial, Corporativo, Poste.
+          - Si el usuario es TÉCNICO, prioriza: Servicio Básico, Recableado/Mudanza, Servicio Corporativo.
+          - Mapea "servicio básico" o "revisión" -> SERVICE_BASIC.
+          - Mapea "recableado", "mudanza", "traslado" -> SERVICE_REWIRING.
+          - Mapea "servicio corporativo" -> SERVICE_CORP.
+          - Extrae cantidad y fecha (si dice "ayer", resta 1 día).
+      3.  QUERY: Usa los "DATOS DE CONTEXTO" para responder concisamente.
+      4.  GENERAL_CHAT: Breve y profesional.
       
-      Precios de Referencia:
+      Precios Configurados:
+      [Instalación]
       - Residential: $${prices[InstallType.RESIDENTIAL]}
       - Corporate: $${prices[InstallType.CORPORATE]}
       - Poste: $${prices[InstallType.POSTE]}
-      - Service: $${prices[InstallType.SERVICE]}
+      - Service (Legacy): $${prices[InstallType.SERVICE]}
+      
+      [Servicio Técnico]
+      - Srv. Básico: $${prices[InstallType.SERVICE_BASIC]}
+      - Recableado/Mudanza: $${prices[InstallType.SERVICE_REWIRING]}
+      - Srv. Corp: $${prices[InstallType.SERVICE_CORP]}
     `;
 };
 

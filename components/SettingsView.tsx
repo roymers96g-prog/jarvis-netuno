@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSettings, InstallType } from '../types';
+import { AppSettings, InstallType, UserProfile } from '../types';
 import { LABELS } from '../constants';
-import { exportBackupData, importBackupData, generateCSV } from '../services/storageService';
+import { exportBackupData, importBackupData, generateCSV, wipeUserData } from '../services/storageService';
 import { validateApiKey } from '../services/geminiService';
 import { getEffectiveApiKey } from '../services/settingsService';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet } from 'lucide-react';
+import { ConfirmationModal } from './ConfirmationModal';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet, HardHat, Wrench, Trash2, AlertTriangle } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -16,6 +18,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const [isSaved, setIsSaved] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing' | 'validating'>('checking');
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [showWipeModal, setShowWipeModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -156,6 +159,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     event.target.value = '';
   };
 
+  const handleWipeData = async () => {
+    await wipeUserData();
+    setShowWipeModal(false);
+    window.location.reload();
+  };
+
+  // Group prices by profile
+  const installerTypes = [InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE, InstallType.SERVICE];
+  const technicianTypes = [InstallType.SERVICE_BASIC, InstallType.SERVICE_REWIRING, InstallType.SERVICE_CORP];
+
   return (
     <div className="space-y-8 animate-fadeIn">
       <header className="flex flex-col gap-2 pb-4">
@@ -220,27 +233,82 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
 
       {/* Profile Section */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PERFIL</h3>
-        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl">
-          <div className="flex items-center gap-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PERFIL Y ROL</h3>
+        <div className="p-4 glass-panel rounded-2xl space-y-4">
+          <div className="flex items-center gap-3 border-b border-slate-200 dark:border-white/5 pb-4">
             <User className="text-cyan-600 dark:text-zinc-400" />
-            <div>
+            <div className="flex-1">
               <span className="block font-bold dark:text-white text-slate-800 text-sm">Nombre de Usuario</span>
-              <span className="text-[10px] dark:text-zinc-500 text-slate-500">
-                Así te llamará Jarvis
-              </span>
+              <input 
+                 type="text"
+                 value={localSettings.nickname}
+                 onChange={(e) => setLocalSettings(p => ({ ...p, nickname: e.target.value }))}
+                 className="w-full bg-transparent border-none outline-none text-xs dark:text-zinc-400 text-slate-500 font-medium placeholder:text-slate-400"
+                 placeholder="Tu nombre"
+              />
             </div>
           </div>
-          <input 
-             type="text"
-             value={localSettings.nickname}
-             onChange={(e) => setLocalSettings(p => ({ ...p, nickname: e.target.value }))}
-             placeholder="Técnico"
-             className="w-32 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-medium text-sm dark:text-white text-slate-900"
-          />
+
+          <div className="grid grid-cols-2 gap-3">
+             <button
+                onClick={() => setLocalSettings(p => ({ ...p, profile: 'INSTALLER' }))}
+                className={`p-3 rounded-lg border flex flex-col items-center gap-1 transition-all ${localSettings.profile === 'INSTALLER' ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
+             >
+                <HardHat size={20} />
+                <span className="text-[10px] font-bold">INSTALADOR</span>
+             </button>
+             <button
+                onClick={() => setLocalSettings(p => ({ ...p, profile: 'TECHNICIAN' }))}
+                className={`p-3 rounded-lg border flex flex-col items-center gap-1 transition-all ${localSettings.profile === 'TECHNICIAN' ? 'bg-violet-500/10 border-violet-500/50 text-violet-600 dark:text-violet-400' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
+             >
+                <Wrench size={20} />
+                <span className="text-[10px] font-bold">TÉCNICO</span>
+             </button>
+          </div>
         </div>
       </section>
       
+      {/* Price Settings */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PRECIOS - INSTALACIONES</h3>
+        <div className="grid gap-3">
+          {installerTypes.map((type) => (
+            <div key={type} className="flex items-center justify-between p-4 glass-panel rounded-2xl">
+              <span className="font-bold dark:text-zinc-300 text-slate-700 text-sm">{LABELS[type]}</span>
+              <div className="flex items-center gap-1">
+                <DollarSign size={14} className="text-slate-400" />
+                <input 
+                  type="number" 
+                  value={localSettings.customPrices[type]}
+                  onChange={(e) => handleChangePrice(type, e.target.value)}
+                  className="w-16 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-mono font-bold text-lg dark:text-white text-slate-900"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PRECIOS - SERVICIO TÉCNICO</h3>
+        <div className="grid gap-3">
+          {technicianTypes.map((type) => (
+            <div key={type} className="flex items-center justify-between p-4 glass-panel rounded-2xl border-l-4 border-l-orange-500/50">
+              <span className="font-bold dark:text-zinc-300 text-slate-700 text-sm">{LABELS[type]}</span>
+              <div className="flex items-center gap-1">
+                <DollarSign size={14} className="text-slate-400" />
+                <input 
+                  type="number" 
+                  value={localSettings.customPrices[type]}
+                  onChange={(e) => handleChangePrice(type, e.target.value)}
+                  className="w-16 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-mono font-bold text-lg dark:text-white text-slate-900"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Goal Section */}
       <section className="space-y-3">
         <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">METAS DE PRODUCCIÓN</h3>
@@ -406,24 +474,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
         />
       </section>
 
-      {/* Price Settings */}
-      <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PRECIOS</h3>
-        <div className="grid gap-3">
-          {Object.values(InstallType).map((type) => (
-            <div key={type} className="flex items-center justify-between p-4 glass-panel rounded-2xl">
-              <span className="font-bold dark:text-zinc-300 text-slate-700 text-sm">{LABELS[type]}</span>
-              <div className="flex items-center gap-1">
-                <DollarSign size={14} className="text-slate-400" />
-                <input 
-                  type="number" 
-                  value={localSettings.customPrices[type]}
-                  onChange={(e) => handleChangePrice(type, e.target.value)}
-                  className="w-16 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-mono font-bold text-lg dark:text-white text-slate-900"
-                />
-              </div>
-            </div>
-          ))}
+      {/* DANGER ZONE */}
+      <section className="space-y-3 pt-6 border-t border-red-500/20">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-red-500 mb-2 flex items-center gap-2">
+          <AlertTriangle size={12} /> ZONA DE PELIGRO
+        </h3>
+        <div className="p-4 rounded-2xl bg-red-500/5 border border-red-500/20 flex items-center justify-between">
+          <div>
+            <span className="block font-bold dark:text-red-200 text-red-800 text-sm">Borrar Todos los Datos</span>
+            <span className="text-[10px] text-red-500/70 block max-w-[200px] leading-tight mt-1">
+              Elimina registros locales y de la nube. Irreversible.
+            </span>
+          </div>
+          <button 
+            onClick={() => setShowWipeModal(true)}
+            className="p-3 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-lg shadow-red-500/20 transition-all hover:scale-105"
+          >
+            <Trash2 size={18} />
+          </button>
         </div>
       </section>
 
@@ -452,6 +520,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
           {isSaved ? 'GUARDADO' : 'GUARDAR TODO'}
         </button>
       </div>
+
+      <ConfirmationModal 
+        isOpen={showWipeModal}
+        onClose={() => setShowWipeModal(false)}
+        onConfirm={handleWipeData}
+        title="¿ESTÁS SEGURO?"
+        message="Esta acción eliminará permanentemente todos tus registros de instalación tanto de este dispositivo como de la nube. No se puede deshacer."
+      />
       
       <div className="h-24"></div>
     </div>
