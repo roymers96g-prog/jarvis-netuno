@@ -220,13 +220,17 @@ const App: React.FC = () => {
     setIsMenuOpen(false);
   };
 
-  // ASYNC: Handle Quick Add via Widget
-  const handleQuickAdd = async (type: InstallType) => {
-    const newRecordsList = await saveRecord(type, 1);
+  // ASYNC: Handle Quick Add via Widget (Single or Batch)
+  const handleQuickAdd = async (type: InstallType, quantity: number = 1, dateStr?: string) => {
+    const newRecordsList = await saveRecord(type, quantity, dateStr);
     setRecords(newRecordsList);
     triggerSuccessEffect();
     
-    const responseText = `Registro completado.`;
+    const label = LABELS[type] || type;
+    const responseText = quantity > 1 
+      ? `Registrados ${quantity} servicios de ${label}.`
+      : `Registro de ${label} completado.`;
+
     const confirmMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'jarvis',

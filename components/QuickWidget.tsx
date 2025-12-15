@@ -1,20 +1,37 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { InstallType } from '../types';
-import { Router, Server, Cable, Zap, Check, TabletSmartphone, ArrowLeftRight, Database, Wifi } from 'lucide-react';
+import { Router, Server, Cable, Zap, Check, TabletSmartphone, ArrowLeftRight, Database, Wifi, Calendar, Layers, Plus, Minus, ChevronLeft, Save } from 'lucide-react';
 import { getSettings } from '../services/settingsService';
+import { LABELS, COLORS } from '../constants';
 
 interface QuickWidgetProps {
-  onQuickAdd: (type: InstallType) => void;
+  onQuickAdd: (type: InstallType, quantity?: number, date?: string) => void;
   isOpen: boolean;
   onClose: () => void;
   prices: { [key in InstallType]: number };
 }
 
 export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, onClose, prices }) => {
+  const [mode, setMode] = useState<'quick' | 'batch'>('quick');
   const [clickedType, setClickedType] = useState<InstallType | null>(null);
   const settings = getSettings();
   const isTechnician = settings.profile === 'TECHNICIAN';
+
+  // Batch Mode State
+  const [batchType, setBatchType] = useState<InstallType | null>(null);
+  const [batchQty, setBatchQty] = useState(1);
+  const [batchDate, setBatchDate] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen) {
+        const today = new Date().toISOString().split('T')[0];
+        setBatchDate(today);
+        setMode('quick');
+        setBatchQty(1);
+        setBatchType(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -30,6 +47,11 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
       onQuickAdd(type);
       setClickedType(null);
     }, 400);
+  };
+
+  const handleBatchSubmit = () => {
+      if (!batchType) return;
+      onQuickAdd(batchType, batchQty, batchDate);
   };
 
   const getButtonClass = (type: InstallType, baseBorder: string, hoverBorder: string, hoverBg: string, activeBg: string) => {
@@ -134,6 +156,10 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
     </>
   );
 
+  const availableTypes = isTechnician 
+    ? [InstallType.SERVICE_BASIC, InstallType.SERVICE_REWIRING, InstallType.SERVICE_CORP]
+    : [InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE, InstallType.SERVICE];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
       <div className="w-full max-w-sm dark:bg-zinc-950 bg-blue-50/95 border dark:border-zinc-800 border-white/50 rounded-3xl p-6 shadow-2xl animate-scaleIn transform transition-all relative overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -142,14 +168,93 @@ export const QuickWidget: React.FC<QuickWidgetProps> = ({ onQuickAdd, isOpen, on
 
         <div className="flex justify-between items-center mb-6 relative z-10">
           <h3 className="text-xl font-bold dark:text-white text-slate-900 tracking-widest flex items-center gap-2">
-            <Zap className="text-yellow-400" fill="currentColor" /> {isTechnician ? 'TÉCNICO' : 'INSTALADOR'}
+            {mode === 'batch' && <button onClick={() => setMode('quick')} className="mr-1 hover:text-cyan-500"><ChevronLeft size={24} /></button>}
+            <Zap className="text-yellow-400" fill="currentColor" /> 
+            {mode === 'batch' ? 'MANUAL / LOTES' : (isTechnician ? 'TÉCNICO FTTH' : 'INSTALADOR FTTH')}
           </h3>
           <button onClick={onClose} className="dark:text-zinc-500 text-slate-500 hover:text-cyan-500 font-medium text-sm">Cerrar</button>
         </div>
         
-        <div className="grid grid-cols-2 gap-4 relative z-10">
-          {isTechnician ? renderTechnicianButtons() : renderInstallerButtons()}
-        </div>
+        {mode === 'quick' ? (
+            <>
+                <div className="grid grid-cols-2 gap-4 relative z-10">
+                {isTechnician ? renderTechnicianButtons() : renderInstallerButtons()}
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 relative z-10">
+                    <button 
+                        onClick={() => setMode('batch')}
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-200 dark:bg-zinc-800/50 hover:bg-slate-300 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 font-bold transition-colors"
+                    >
+                        <Layers size={18} />
+                        Carga por Lotes / Personalizada
+                    </button>
+                </div>
+            </>
+        ) : (
+            <div className="space-y-5 relative z-10 animate-slideUp">
+                {/* 1. Select Type */}
+                <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-wider">1. Tipo de Trabajo</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {availableTypes.map(type => (
+                            <button
+                                key={type}
+                                onClick={() => setBatchType(type)}
+                                className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 ${
+                                    batchType === type 
+                                    ? 'bg-cyan-500 border-cyan-500 text-white' 
+                                    : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:border-cyan-500/50'
+                                }`}
+                            >
+                                <div className={`w-2 h-2 rounded-full ${batchType === type ? 'bg-white' : ''}`} style={{ backgroundColor: batchType === type ? 'white' : COLORS[type] }} />
+                                {LABELS[type]}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    {/* 2. Quantity */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-wider">2. Cantidad</label>
+                        <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-1">
+                            <button onClick={() => setBatchQty(Math.max(1, batchQty - 1))} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg text-slate-500"><Minus size={16} /></button>
+                            <input 
+                                type="number" 
+                                value={batchQty} 
+                                onChange={(e) => setBatchQty(parseInt(e.target.value) || 1)}
+                                className="w-full bg-transparent text-center font-bold text-lg dark:text-white outline-none" 
+                            />
+                            <button onClick={() => setBatchQty(batchQty + 1)} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg text-cyan-500"><Plus size={16} /></button>
+                        </div>
+                    </div>
+
+                    {/* 3. Date */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-wider">3. Fecha</label>
+                        <div className="relative">
+                            <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input 
+                                type="date" 
+                                value={batchDate}
+                                onChange={(e) => setBatchDate(e.target.value)}
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl py-3 pl-9 pr-3 text-sm font-bold dark:text-white outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <button 
+                    onClick={handleBatchSubmit}
+                    disabled={!batchType || !batchDate || batchQty < 1}
+                    className="w-full py-4 mt-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-zinc-800 disabled:text-slate-500 text-white rounded-xl font-bold tracking-widest shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                    <Save size={20} />
+                    REGISTRAR LOTE
+                </button>
+            </div>
+        )}
       </div>
     </div>
   );
