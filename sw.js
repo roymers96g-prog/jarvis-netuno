@@ -1,9 +1,9 @@
 
-const CACHE_NAME = 'netuno-jarvis-v19'; // Incrementado para forzar actualización
+const CACHE_NAME = 'netuno-jarvis-v20'; // Incrementado
 const ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json',
+  // '/manifest.json', // Eliminado para evitar error 404 si el archivo cambia de nombre o ruta en el build
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap'
 ];
@@ -24,7 +24,7 @@ self.addEventListener('activate', (event) => {
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
             console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName); // Borra la caché vieja (v18)
+            return caches.delete(cacheName); 
           }
         })
       );
