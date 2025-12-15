@@ -1,4 +1,5 @@
-const CACHE_NAME = 'netuno-jarvis-v18';
+
+const CACHE_NAME = 'netuno-jarvis-v19'; // Incrementado para forzar actualización
 const ASSETS = [
   '/',
   '/index.html',
@@ -8,7 +9,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  self.skipWaiting(); // Fuerza al SW a activarse inmediatamente
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
@@ -23,11 +24,11 @@ self.addEventListener('activate', (event) => {
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
             console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+            return caches.delete(cacheName); // Borra la caché vieja (v18)
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()) // Toma control de la página inmediatamente
   );
 });
 

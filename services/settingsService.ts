@@ -2,9 +2,6 @@
 import { AppSettings, InstallType } from '../types';
 import { DEFAULT_PRICES, SETTINGS_STORAGE_KEY } from '../constants';
 
-// Declare process for TS
-declare var process: any;
-
 const USER_ID_KEY = 'netuno_device_user_id';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -23,7 +20,6 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 // Genera o recupera un ID único para este usuario/dispositivo
-// Esto permite filtrar los datos en Supabase para que no se mezclen con otros usuarios
 export const getUserId = (): string => {
   let userId = localStorage.getItem(USER_ID_KEY);
   if (!userId) {
@@ -65,10 +61,16 @@ export const getAllPrices = () => {
 };
 
 // Helper to get effective key (User Setting > Environment Variable)
+// FIX: Vite uses import.meta.env and variables must start with VITE_
 export const getEffectiveApiKey = (): string => {
   const settings = getSettings();
-  if (settings.apiKey && settings.apiKey.trim().length > 0) {
+  
+  // 1. Prioridad: Llave manual guardada en configuración
+  if (settings.apiKey && settings.apiKey.trim().length > 10) {
     return settings.apiKey.trim();
   }
-  return process.env.API_KEY || '';
+  
+  // 2. Fallback: Variable de entorno (Vercel/Vite)
+  // Debe llamarse VITE_GOOGLE_API_KEY en Vercel
+  return (import.meta as any).env?.VITE_GOOGLE_API_KEY || '';
 };

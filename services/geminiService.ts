@@ -3,17 +3,15 @@ import { GoogleGenAI, Type, Schema, Chat, GenerateContentResponse } from "@googl
 import { InstallType, InstallationRecord, ExtractedData } from "../types";
 import { getAllPrices, getEffectiveApiKey, getSettings } from "./settingsService";
 
-let ai: GoogleGenAI | null = null;
+// No cacheamos 'ai' globalmente para evitar problemas si la key cambia en tiempo de ejecución
 let chat: Chat | null = null;
 
 const getAiInstance = (): GoogleGenAI => {
-  if (ai) return ai;
   const apiKey = getEffectiveApiKey();
-  if (!apiKey) {
-    throw new Error("API Key missing");
+  if (!apiKey || apiKey.length < 10) {
+    throw new Error("API Key faltante o inválida");
   }
-  ai = new GoogleGenAI({ apiKey });
-  return ai;
+  return new GoogleGenAI({ apiKey });
 };
 
 const RESPONSE_SCHEMA: Schema = {
@@ -118,17 +116,21 @@ export const resetChat = () => {
 };
 
 // Function to test the API Key specifically
-export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+export const validateApiKey = async (apiKey: string): Promise<{valid: boolean; error?: string}> => {
   try {
     const testAI = new GoogleGenAI({ apiKey });
     await testAI.models.generateContent({
       model: "gemini-2.5-flash",
       contents: "Test connection",
     });
-    return true;
-  } catch (e) {
+    return { valid: true };
+  } catch (e: any) {
     console.error("Validation failed", e);
-    return false;
+    let msg = "Error desconocido";
+    if (e.message?.includes('403') || e.message?.includes('API key')) msg = "API Key inválida o sin permisos.";
+    else if (e.message?.includes('not found')) msg = "Modelo no disponible para esta Key.";
+    else if (e.message?.includes('fetch')) msg = "Error de conexión/internet.";
+    return { valid: false, error: msg };
   }
 };
 
@@ -145,8 +147,8 @@ export const processUserMessage = async (message: string, records: InstallationR
     if (!chat) {
         initializeChat();
     }
-    if (!chat) { // If initialization failed
-        throw new Error("Chat not initialized. Check API Key.");
+    if (!chat) { // If initialization failed after retry
+        throw new Error("API_KEY_MISSING");
     }
 
     // Create data summary for context
@@ -191,21 +193,21 @@ export const processUserMessage = async (message: string, records: InstallationR
 
     return JSON.parse(text);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini User Message Error:", error);
-    if (error instanceof Error) {
-      if (error.message.includes("API Key missing") || error.message.includes("403") || error.message.includes("API key")) {
+    
+    if (error.message === "API_KEY_MISSING" || error.toString().includes("API Key") || error.toString().includes("403")) {
          return {
           intent: 'GENERAL_CHAT',
           records: [],
-          jarvisResponse: "⚠️ Error: Falta la API Key o es inválida. Verifica en Configuración."
+          jarvisResponse: "⚠️ Error Crítico: No se detecta una API Key válida. Por favor configúrala en el menú de Configuración."
         };
-      }
     }
+    
     return {
       intent: 'GENERAL_CHAT',
       records: [],
-      jarvisResponse: "Error de conexión con IA. Verifica tu internet y tu API Key."
+      jarvisResponse: "Lo siento, hubo un error de conexión con mi cerebro digital. Intenta de nuevo."
     };
   }
 };

@@ -17,6 +17,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [isSaved, setIsSaved] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing' | 'validating'>('checking');
+  const [apiErrorMsg, setApiErrorMsg] = useState<string>('');
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showWipeModal, setShowWipeModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,7 +25,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   useEffect(() => {
     const key = localSettings.apiKey?.trim() || getEffectiveApiKey();
     if (key && key.length > 20) {
-      if (apiKeyStatus !== 'validating') setApiKeyStatus('ok');
+      if (apiKeyStatus !== 'validating' && apiKeyStatus !== 'ok') setApiKeyStatus('checking'); // Reset visual state mostly
     } else {
       setApiKeyStatus('missing');
     }
@@ -66,18 +67,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
 
   const handleTestApiKey = async () => {
     const key = localSettings.apiKey?.trim();
-    if (!key) return;
+    if (!key) {
+      alert("Por favor ingresa una API Key primero.");
+      return;
+    }
 
     setApiKeyStatus('validating');
+    setApiErrorMsg('');
+    
+    // Guardamos temporalmente para que el validador use esta key
     onSave(localSettings); 
     
-    const isValid = await validateApiKey(key);
-    if (isValid) {
+    const result = await validateApiKey(key);
+    
+    if (result.valid) {
       setApiKeyStatus('ok');
-      alert("✅ ¡Conexión Exitosa! La API Key funciona correctamente.");
+      setApiErrorMsg('');
+      alert("✅ ¡Conexión Exitosa! La IA está operativa.");
     } else {
       setApiKeyStatus('missing');
-      alert("❌ Error: La API Key no funciona. Verifica que la copiaste correctamente.");
+      setApiErrorMsg(result.error || "Error desconocido");
+      alert(`❌ Error: ${result.error || "La API Key no funciona"}`);
     }
   };
 
@@ -215,14 +225,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
               type="password"
               value={localSettings.apiKey}
               onChange={(e) => setLocalSettings(p => ({ ...p, apiKey: e.target.value }))}
-              placeholder="Pega tu llave aquí..."
+              placeholder={getEffectiveApiKey() ? "Usando variable de entorno (Oculta)" : "Pega tu llave aquí..."}
               className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-sm dark:text-white text-slate-900 pb-2 placeholder:text-slate-400 font-mono"
             />
+            {apiErrorMsg && (
+              <p className="text-[10px] text-red-500 mt-2 font-bold">{apiErrorMsg}</p>
+            )}
           </div>
 
           <button 
             onClick={handleTestApiKey}
-            disabled={!localSettings.apiKey || apiKeyStatus === 'validating'}
+            disabled={!localSettings.apiKey && !getEffectiveApiKey() || apiKeyStatus === 'validating'}
             className="w-full py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {apiKeyStatus === 'validating' ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
