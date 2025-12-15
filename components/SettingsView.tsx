@@ -25,7 +25,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   useEffect(() => {
     const key = localSettings.apiKey?.trim() || getEffectiveApiKey();
     if (key && key.length > 20) {
-      if (apiKeyStatus !== 'validating' && apiKeyStatus !== 'ok') setApiKeyStatus('checking'); // Reset visual state mostly
+      // Si ya estaba ok, lo dejamos visualmente ok hasta que el usuario intente validar de nuevo
+      if (apiKeyStatus !== 'validating' && apiKeyStatus !== 'ok' && !apiErrorMsg) setApiKeyStatus('checking'); 
     } else {
       setApiKeyStatus('missing');
     }
@@ -87,7 +88,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     } else {
       setApiKeyStatus('missing');
       setApiErrorMsg(result.error || "Error desconocido");
-      alert(`❌ Error: ${result.error || "La API Key no funciona"}`);
+      // Mostrar alerta con el error detallado
+      alert(result.error || "Error al conectar con Gemini");
     }
   };
 
@@ -229,7 +231,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
               className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-sm dark:text-white text-slate-900 pb-2 placeholder:text-slate-400 font-mono"
             />
             {apiErrorMsg && (
-              <p className="text-[10px] text-red-500 mt-2 font-bold">{apiErrorMsg}</p>
+              <div className="flex items-start gap-2 mt-2 bg-red-500/10 p-2 rounded text-[11px] text-red-600 dark:text-red-400 font-bold border border-red-500/20">
+                 <AlertTriangle size={14} className="min-w-[14px] mt-0.5" />
+                 <span>{apiErrorMsg}</span>
+              </div>
             )}
           </div>
 

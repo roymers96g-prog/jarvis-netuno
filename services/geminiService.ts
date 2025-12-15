@@ -117,19 +117,40 @@ export const resetChat = () => {
 
 // Function to test the API Key specifically
 export const validateApiKey = async (apiKey: string): Promise<{valid: boolean; error?: string}> => {
+  if (!apiKey || apiKey.trim().length < 30) {
+      return { valid: false, error: "⚠️ Formato inválido: La Key es demasiado corta." };
+  }
+
   try {
     const testAI = new GoogleGenAI({ apiKey });
+    // Usamos un prompt mínimo para probar conectividad
     await testAI.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: "Test connection",
+      contents: "Hi",
     });
     return { valid: true };
   } catch (e: any) {
-    console.error("Validation failed", e);
-    let msg = "Error desconocido";
-    if (e.message?.includes('403') || e.message?.includes('API key')) msg = "API Key inválida o sin permisos.";
-    else if (e.message?.includes('not found')) msg = "Modelo no disponible para esta Key.";
-    else if (e.message?.includes('fetch')) msg = "Error de conexión/internet.";
+    console.error("Validation failed detail:", e);
+    
+    let msg = "Error desconocido al conectar con Gemini.";
+    const errString = e.toString().toLowerCase();
+    const errMsg = e.message?.toLowerCase() || "";
+
+    // Clasificación de errores comunes de la API de Google
+    if (errMsg.includes('key') || errMsg.includes('403') || errString.includes('permission_denied') || errMsg.includes('api key not valid')) {
+        msg = "⛔ API Key rechazada. Verifica que la has copiado correctamente de Google AI Studio.";
+    } else if (errMsg.includes('not found') || errMsg.includes('404')) {
+        msg = "🔍 Modelo no encontrado. Tu Key podría no tener acceso a 'gemini-2.5-flash'.";
+    } else if (errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('failed to fetch')) {
+        msg = "📡 Error de conexión. Revisa tu internet o firewall.";
+    } else if (errMsg.includes('quota') || errMsg.includes('429') || errMsg.includes('exhausted')) {
+        msg = "⏳ Cuota excedida. Has superado el límite gratuito de solicitudes a Gemini por hoy.";
+    } else if (errMsg.includes('location') || errMsg.includes('region') || errMsg.includes('unsupported location')) {
+        msg = "🌍 Ubicación no soportada. La API no está disponible en tu región/IP actual.";
+    } else if (errMsg.includes('load failed')) {
+        msg = "📱 Error de red del dispositivo. Intenta desactivar el Wi-Fi o usar datos.";
+    }
+
     return { valid: false, error: msg };
   }
 };
