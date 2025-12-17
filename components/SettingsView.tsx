@@ -6,7 +6,7 @@ import { exportBackupData, importBackupData, generateCSV, wipeUserData } from '.
 import { validateApiKey } from '../services/geminiService';
 import { getEffectiveApiKey } from '../services/settingsService';
 import { ConfirmationModal } from './ConfirmationModal';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet, HardHat, Wrench, Trash2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet, HardHat, Wrench, Trash2, AlertTriangle, Eye, EyeOff, Plus, Minus } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -48,23 +48,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   }, []);
 
   const handleChangePrice = (type: InstallType, val: string) => {
+    // Permitir borrar el valor (string vacío se convierte en 0)
     const num = parseFloat(val);
-    if (!isNaN(num)) {
-      setLocalSettings(prev => ({
+    setLocalSettings(prev => ({
+      ...prev,
+      customPrices: {
+        ...prev.customPrices,
+        [type]: isNaN(num) ? 0 : num
+      }
+    }));
+  };
+
+  const adjustPrice = (type: InstallType, delta: number) => {
+    setLocalSettings(prev => {
+      const current = prev.customPrices[type] || 0;
+      const newVal = Math.max(0, current + delta);
+      return {
         ...prev,
         customPrices: {
           ...prev.customPrices,
-          [type]: num
+          [type]: newVal
         }
-      }));
-    }
+      };
+    });
+  };
+
+  const cleanApiKey = (key: string) => {
+    // Limpieza agresiva en frontend (espacios, saltos, caracteres invisibles)
+    return key ? key.trim().replace(/[\r\n\s\u200B-\u200D\uFEFF]/g, '') : '';
   };
 
   const handleSave = () => {
-    // Limpieza de seguridad al guardar: quitar espacios
     const cleanSettings = {
         ...localSettings,
-        apiKey: localSettings.apiKey.trim().replace(/[\r\n\s]/g, '')
+        apiKey: cleanApiKey(localSettings.apiKey)
     };
     onSave(cleanSettings);
     setIsSaved(true);
@@ -72,11 +89,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   };
 
   const handleTestApiKey = async () => {
-    // Limpieza agresiva antes de validar
     const rawKey = localSettings.apiKey || "";
-    const key = rawKey.trim().replace(/[\r\n\s]/g, ''); // Quita espacios y enters
+    const key = cleanApiKey(rawKey);
     
-    // Actualizamos el estado local con la llave limpia para que el usuario lo vea corregido
+    // Actualizamos visualmente para que el usuario vea que se limpió
     if (key !== rawKey) {
         setLocalSettings(p => ({ ...p, apiKey: key }));
     }
@@ -314,36 +330,73 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
         <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PRECIOS - INSTALACIONES</h3>
         <div className="grid gap-3">
           {installerTypes.map((type) => (
-            <div key={type} className="flex items-center justify-between p-4 glass-panel rounded-2xl">
+            <div key={type} className="flex items-center justify-between p-3 glass-panel rounded-2xl">
               <span className="font-bold dark:text-zinc-300 text-slate-700 text-sm">{LABELS[type]}</span>
-              <div className="flex items-center gap-1">
-                <DollarSign size={14} className="text-slate-400" />
-                <input 
-                  type="number" 
-                  value={localSettings.customPrices[type]}
-                  onChange={(e) => handleChangePrice(type, e.target.value)}
-                  className="w-16 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-mono font-bold text-lg dark:text-white text-slate-900"
-                />
+              
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-800 rounded-xl p-1">
+                <button 
+                  onClick={() => adjustPrice(type, -1)}
+                  className="p-2 text-slate-500 hover:text-cyan-600 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                >
+                  <Minus size={16} />
+                </button>
+                
+                <div className="relative w-16">
+                    <DollarSign size={12} className="absolute left-1 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input 
+                      type="number" 
+                      value={localSettings.customPrices[type] === 0 ? '' : localSettings.customPrices[type]}
+                      onChange={(e) => handleChangePrice(type, e.target.value)}
+                      placeholder="0"
+                      className="w-full bg-transparent text-center font-mono font-bold text-lg dark:text-white text-slate-900 outline-none pl-3 appearance-none"
+                    />
+                </div>
+
+                <button 
+                  onClick={() => adjustPrice(type, 1)}
+                  className="p-2 text-slate-500 hover:text-cyan-600 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                >
+                  <Plus size={16} />
+                </button>
               </div>
             </div>
           ))}
         </div>
       </section>
 
+      {/* Technician Settings */}
       <section className="space-y-3">
         <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PRECIOS - SERVICIO TÉCNICO</h3>
         <div className="grid gap-3">
           {technicianTypes.map((type) => (
-            <div key={type} className="flex items-center justify-between p-4 glass-panel rounded-2xl border-l-4 border-l-orange-500/50">
+            <div key={type} className="flex items-center justify-between p-3 glass-panel rounded-2xl border-l-4 border-l-orange-500/50">
               <span className="font-bold dark:text-zinc-300 text-slate-700 text-sm">{LABELS[type]}</span>
-              <div className="flex items-center gap-1">
-                <DollarSign size={14} className="text-slate-400" />
-                <input 
-                  type="number" 
-                  value={localSettings.customPrices[type]}
-                  onChange={(e) => handleChangePrice(type, e.target.value)}
-                  className="w-16 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-mono font-bold text-lg dark:text-white text-slate-900"
-                />
+              
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-800 rounded-xl p-1">
+                <button 
+                  onClick={() => adjustPrice(type, -1)}
+                  className="p-2 text-slate-500 hover:text-orange-600 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                >
+                  <Minus size={16} />
+                </button>
+                
+                <div className="relative w-16">
+                    <DollarSign size={12} className="absolute left-1 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input 
+                      type="number" 
+                      value={localSettings.customPrices[type] === 0 ? '' : localSettings.customPrices[type]}
+                      onChange={(e) => handleChangePrice(type, e.target.value)}
+                      placeholder="0"
+                      className="w-full bg-transparent text-center font-mono font-bold text-lg dark:text-white text-slate-900 outline-none pl-3 appearance-none"
+                    />
+                </div>
+
+                <button 
+                  onClick={() => adjustPrice(type, 1)}
+                  className="p-2 text-slate-500 hover:text-orange-600 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                >
+                  <Plus size={16} />
+                </button>
               </div>
             </div>
           ))}

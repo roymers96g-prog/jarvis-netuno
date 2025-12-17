@@ -5,9 +5,15 @@ import { getAllPrices, getEffectiveApiKey, getSettings } from "./settingsService
 
 // No cacheamos 'ai' globalmente para evitar problemas si la key cambia en tiempo de ejecución
 let chat: Chat | null = null;
+let currentModelUsed = "gemini-2.5-flash"; // Track active model
+
+const cleanApiKey = (key: string) => {
+  // Elimina espacios, saltos de línea, zero-width spaces (\u200B), y otros caracteres invisibles
+  return key ? key.trim().replace(/[\r\n\s\u200B-\u200D\uFEFF]/g, '') : '';
+};
 
 const getAiInstance = (): GoogleGenAI => {
-  const apiKey = getEffectiveApiKey();
+  const apiKey = cleanApiKey(getEffectiveApiKey());
   if (!apiKey || apiKey.length < 10) {
     throw new Error("API Key faltante o inválida");
   }
@@ -92,11 +98,14 @@ const getSystemInstruction = () => {
     `;
 };
 
-const initializeChat = () => {
+const initializeChat = (modelName: string = "gemini-2.5-flash") => {
     try {
         const aiInstance = getAiInstance();
+        currentModelUsed = modelName;
+        console.log(`Initializing chat with model: ${modelName}`);
+        
         chat = aiInstance.chats.create({
-            model: "gemini-2.5-flash",
+            model: modelName,
             config: {
                 systemInstruction: getSystemInstruction(),
                 responseMimeType: "application/json",
@@ -117,14 +126,15 @@ export const resetChat = () => {
 
 // Function to test the API Key specifically
 export const validateApiKey = async (rawApiKey: string): Promise<{valid: boolean; error?: string}> => {
-  // 1. Limpieza Agresiva: Elimina espacios, tabs y saltos de línea que suelen colarse al copiar en móviles
-  const apiKey = rawApiKey ? rawApiKey.trim().replace(/[\r\n\s]/g, '') : '';
+  // 1. Limpieza Agresiva: Elimina espacios, tabs, saltos de línea Y caracteres invisibles (Zero Width Space)
+  const apiKey = cleanApiKey(rawApiKey);
 
   if (!apiKey || apiKey.length < 30) {
       return { valid: false, error: "⚠️ La Key parece incompleta o demasiado corta." };
   }
 
   const testModel = async (modelName: string) => {
+    console.log(`Testing model: ${modelName}`);
     const testAI = new GoogleGenAI({ apiKey });
     await testAI.models.generateContent({
       model: modelName,
@@ -133,36 +143,40 @@ export const validateApiKey = async (rawApiKey: string): Promise<{valid: boolean
   };
 
   try {
-    // Intentar primero con el modelo 2.5 (más rápido/barato/inteligente)
+    // Intentar primero con el modelo 2.5
     await testModel("gemini-2.5-flash");
     return { valid: true };
   } catch (e: any) {
     console.warn("Fallo validación con gemini-2.5-flash, intentando fallback...", e.message);
     
-    // Si falla, intentar con 1.5 (por si la llave no tiene acceso a 2.5 en esa región o proyecto)
+    // Fallback 1: gemini-1.5-flash
     try {
         await testModel("gemini-1.5-flash");
         return { valid: true };
     } catch (e2: any) {
-        console.error("Validation failed completely:", e2);
+        console.error("Validation failed with 1.5-flash:", e2);
         
-        let msg = "Error desconocido al conectar con Gemini.";
-        const errString = e2.toString().toLowerCase();
-        const errMsg = e2.message?.toLowerCase() || "";
+        // Fallback 2: gemini-1.5-pro (A veces flash falla pero pro funciona en ciertos proyectos antiguos)
+        try {
+             await testModel("gemini-1.5-pro");
+             return { valid: true };
+        } catch (e3: any) {
+            let msg = "Error desconocido al conectar con Gemini.";
+            const errString = e2.toString().toLowerCase(); // Usamos e2 como referencia principal
+            const errMsg = e2.message?.toLowerCase() || "";
 
-        if (errMsg.includes('key') || errMsg.includes('403') || errString.includes('permission_denied') || errMsg.includes('api key not valid')) {
-            msg = "⛔ API Key rechazada. Verifica que la has copiado correctamente (sin espacios al final).";
-        } else if (errMsg.includes('not found') || errMsg.includes('404')) {
-            msg = "🔍 Modelo no encontrado o Key no válida para este modelo.";
-        } else if (errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('failed to fetch')) {
-            msg = "📡 Error de conexión. Revisa tu internet.";
-        } else if (errMsg.includes('quota') || errMsg.includes('429')) {
-            msg = "⏳ Cuota excedida por hoy.";
-        } else if (errMsg.includes('location') || errMsg.includes('region')) {
-            msg = "🌍 Ubicación no soportada por Google AI.";
+            if (errMsg.includes('key') || errMsg.includes('403') || errString.includes('permission_denied') || errMsg.includes('api key not valid')) {
+                msg = "⛔ API Key rechazada. Verifica que la has copiado correctamente (sin espacios al final).";
+            } else if (errMsg.includes('not found') || errMsg.includes('404')) {
+                msg = "🔍 Modelo no encontrado. Tu API Key es válida pero no tiene acceso a los modelos Flash.";
+            } else if (errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('failed to fetch')) {
+                msg = "📡 Error de conexión. Revisa tu internet.";
+            } else if (errMsg.includes('quota') || errMsg.includes('429')) {
+                msg = "⏳ Cuota excedida por hoy.";
+            }
+
+            return { valid: false, error: msg };
         }
-
-        return { valid: false, error: msg };
     }
   }
 };
@@ -178,13 +192,13 @@ export const processUserMessage = async (message: string, records: InstallationR
 
   try {
     if (!chat) {
-        initializeChat();
+        initializeChat("gemini-2.5-flash");
     }
-    if (!chat) { // If initialization failed after retry
+    if (!chat) { 
         throw new Error("API_KEY_MISSING");
     }
 
-    // Create data summary for context
+    // Context Data Construction
     const now = new Date();
     const todayStr = now.toLocaleDateString('en-CA');
     const currentMonth = now.getMonth();
@@ -220,11 +234,28 @@ export const processUserMessage = async (message: string, records: InstallationR
         "${message}"
     `;
 
-    const response = await chat.sendMessage({ message: promptForGemini });
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    try {
+        const response = await chat.sendMessage({ message: promptForGemini });
+        const text = response.text;
+        if (!text) throw new Error("No response from AI");
+        return JSON.parse(text);
 
-    return JSON.parse(text);
+    } catch (chatError: any) {
+        // Manejo de error de modelo NO ENCONTRADO durante el chat (fallback dinámico)
+        const errStr = chatError.toString().toLowerCase();
+        if (errStr.includes('not found') || errStr.includes('404')) {
+             console.warn(`Model ${currentModelUsed} failed (404). Trying fallback to gemini-1.5-flash...`);
+             
+             // Reinicializar con modelo seguro
+             initializeChat("gemini-1.5-flash");
+             if (chat) {
+                 const responseFallback = await chat.sendMessage({ message: promptForGemini });
+                 const textFallback = responseFallback.text;
+                 if (textFallback) return JSON.parse(textFallback);
+             }
+        }
+        throw chatError; // Re-throw si no es 404 o si fallback falla
+    }
 
   } catch (error: any) {
     console.error("Gemini User Message Error:", error);
