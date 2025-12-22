@@ -307,10 +307,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
               />
               <Bar dataKey="amount" radius={[6, 6, 6, 6]} barSize={32}>
                 {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill="url(#barGradient)" className="dark:hidden" />
-                ))}
-                {chartData.map((entry, index) => (
-                   <Cell key={`cell-dark-${index}`} fill="url(#barGradientDark)" className="hidden dark:block" />
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={settings.theme === 'dark' ? 'url(#barGradientDark)' : 'url(#barGradient)'} 
+                  />
                 ))}
               </Bar>
             </BarChart>
