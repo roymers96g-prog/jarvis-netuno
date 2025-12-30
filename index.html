@@ -66,6 +66,27 @@
         color: #e2e8f0; 
         -webkit-tap-highlight-color: transparent;
       }
+
+      /* Recomendación 5: Modo Alta Visibilidad */
+      .high-contrast {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+      .high-contrast body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+      .high-contrast .glass-panel {
+        background: #ffffff !important;
+        border: 2px solid #000000 !important;
+        box-shadow: none !important;
+        color: #000000 !important;
+      }
+      .high-contrast p, .high-contrast span, .high-contrast h1, .high-contrast h2, .high-contrast h3 {
+        color: #000000 !important;
+        font-weight: 700 !important;
+      }
+
       .glass-panel {
         background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(20px);
@@ -78,23 +99,29 @@
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
       }
       
-      /* Hide scrollbar for Chrome, Safari and Opera */
-      .no-scrollbar::-webkit-scrollbar {
-          display: none;
-      }
-      .no-scrollbar {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
-      }
+      /* Hide scrollbar */
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-      /* Ocultar flechas (spinners) de inputs numéricos */
       input[type=number]::-webkit-inner-spin-button, 
-      input[type=number]::-webkit-outer-spin-button { 
-        -webkit-appearance: none; 
-        margin: 0; 
-      }
-      input[type=number] {
-        -moz-appearance: textfield;
+      input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+      input[type=number] { -moz-appearance: textfield; }
+
+      /* Recomendación 4: Estilos de Impresión para Reportes de Nómina */
+      @media print {
+        body * { visibility: hidden; }
+        .printable-report, .printable-report * { visibility: visible; }
+        .printable-report {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          padding: 40px;
+          color: black !important;
+          background: white !important;
+          font-family: 'Arial', sans-serif;
+        }
+        nav, button, footer, .chat-bar, .no-print { display: none !important; }
       }
     </style>
   <script type="importmap">
@@ -116,14 +143,5 @@
   <body>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('SW registered'))
-            .catch(err => console.log('SW registration failed: ', err));
-        });
-      }
-    </script>
   </body>
 </html>

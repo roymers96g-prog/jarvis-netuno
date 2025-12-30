@@ -4,7 +4,7 @@ import { InstallationRecord, InstallType, AppSettings, UserProfile } from '../ty
 import { LABELS, COLORS } from '../constants';
 import { StatsCard } from './StatsCard';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { DollarSign, Activity, Calendar, Zap, WifiOff, Settings, Target, ServerCrash, CloudOff, Flame, Signal } from 'lucide-react';
+import { DollarSign, Activity, Calendar, Zap, WifiOff, Settings, ServerCrash, CloudOff, Flame, Binary } from 'lucide-react';
 
 interface DashboardProps {
   records: InstallationRecord[];
@@ -30,18 +30,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     };
   }, []);
   
-  // Define types relevant to the current profile
   const relevantTypes = useMemo(() => {
      if (settings.profile === 'TECHNICIAN') {
        return [InstallType.SERVICE_BASIC, InstallType.SERVICE_REWIRING, InstallType.SERVICE_CORP];
      }
-     // Default Installer types (includes generic SERVICE for legacy/mixed use)
      return [InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE, InstallType.SERVICE];
   }, [settings.profile]);
 
   const stats = useMemo(() => {
     const now = new Date();
-    const todayStr = now.toLocaleDateString('en-CA'); // en-CA gives YYY-MM-DD format
+    const todayStr = now.toLocaleDateString('en-CA');
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
@@ -49,7 +47,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     let todayTotal = 0;
     let allTotal = 0;
     
-    // Initialize count with 0 for ALL known types to avoid undefined
     const countByType: Record<string, number> = {};
     Object.values(InstallType).forEach(t => countByType[t] = 0);
 
@@ -72,7 +69,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     return { monthTotal, todayTotal, allTotal, countByType };
   }, [records]);
 
-  // Streak Calculation
   const streak = useMemo(() => {
     if (records.length === 0) return 0;
     const uniqueDates: string[] = Array.from<string>(new Set(records.map(r => new Date(r.date).toLocaleDateString('en-CA')))).sort().reverse();
@@ -106,7 +102,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     return currentStreak;
   }, [records]);
 
-  // Pie Data filtered by profile relevant types
   const pieData = relevantTypes
     .map(type => ({
       name: LABELS[type],
@@ -115,7 +110,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     }))
     .filter(d => d.value > 0);
 
-  // If no specific data found for profile, but there is other data, show "Otros"
   const otherTypesCount = records.filter(r => !relevantTypes.includes(r.type)).length;
   if (otherTypesCount > 0 && pieData.length === 0) {
      pieData.push({ name: 'Otros Registros', value: otherTypesCount, color: '#64748b' });
@@ -125,11 +119,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     const days = 7;
     const result = [];
     
-    // Generate last 7 days based on LOCAL time
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toLocaleDateString('en-CA'); // YYY-MM-DD Local
+      const dateStr = d.toLocaleDateString('en-CA');
       const dayLabel = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase();
       
       const dayAmount = records
@@ -145,7 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
   }, [records]);
 
   const goalProgress = settings.monthlyGoal > 0 ? Math.min(100, (stats.monthTotal / settings.monthlyGoal) * 100) : 0;
-  const circumference = 2 * Math.PI * 45; // r = 45
+  const circumference = 2 * Math.PI * 45; 
   const strokeDashoffset = circumference - (goalProgress / 100) * circumference;
 
   const getStatusConfig = () => {
@@ -160,7 +153,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     if (backendStatus === 'disconnected') {
       return {
         colorClass: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
-        text: 'DESCONECTADO',
+        text: 'SERVIDOR OFFLINE',
         icon: <ServerCrash size={12} />,
         indicatorColor: 'bg-red-500'
       };
@@ -168,14 +161,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
     if (backendStatus === 'checking') {
        return {
         colorClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-        text: 'CONECTANDO...',
+        text: 'SINCRONIZANDO...',
         icon: <CloudOff size={12} />,
         indicatorColor: 'bg-amber-500'
       };
     }
     return {
       colorClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-      text: backendStatus === 'connected' ? 'ONLINE' : 'ONLINE (LOCAL)',
+      text: 'RED ACTIVA',
       icon: null,
       indicatorColor: 'bg-emerald-500',
       pulse: true
@@ -191,10 +184,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
         <div>
           <h2 className="text-2xl font-bold dark:text-white text-slate-800 tracking-tight">Hola, {username || 'Técnico'}</h2>
           <div className="flex items-center gap-2 mt-1">
-             <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium">{roleLabel}</p>
+             <p className="text-cyan-600 dark:text-zinc-500 text-sm font-medium uppercase tracking-widest">{roleLabel}</p>
              {streak > 0 && (
                 <div className="flex items-center gap-1 bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-bold border border-orange-500/20 animate-pulse">
-                   <Flame size={10} fill="currentColor" /> {streak} DÍAS
+                   <Flame size={10} fill="currentColor" /> {streak} DÍAS ACTIVO
                 </div>
              )}
           </div>
@@ -212,17 +205,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
             ) : (
               <span className={`h-2 w-2 rounded-full ${status.indicatorColor}`}></span>
             )}
-            <span className="tracking-wider">{status.text}</span>
+            <span className="tracking-widest">{status.text}</span>
           </div>
         </div>
       </header>
 
-      {/* Monthly Goal Section */}
       <div className="glass-panel rounded-3xl p-6 flex flex-col items-center relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent animate-pulse" />
         <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-4 self-start flex items-center gap-2">
-          <Target size={12} />
-          META MENSUAL
+          <Zap size={12} className="text-yellow-500" />
+          RENDIMIENTO MENSUAL
         </h3>
         {settings.monthlyGoal > 0 ? (
           <div className="w-full flex flex-col items-center animate-scaleIn">
@@ -253,25 +245,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
             </div>
             <div className="text-center mt-4">
               <p className="font-bold text-lg dark:text-white text-slate-800">${stats.monthTotal.toFixed(0)} de ${settings.monthlyGoal}</p>
-              <p className="text-xs text-slate-500 dark:text-zinc-500">
+              <p className="text-xs text-slate-500 dark:text-zinc-500 uppercase tracking-tighter mt-1">
                 {stats.monthTotal >= settings.monthlyGoal
-                  ? '¡Meta alcanzada! 🎉'
-                  : `Faltan $${(settings.monthlyGoal - stats.monthTotal).toFixed(0)} para la meta`
+                  ? '¡Capacidad máxima alcanzada! 🎉'
+                  : `Faltan $${(settings.monthlyGoal - stats.monthTotal).toFixed(0)} para la cuota`
                 }
               </p>
             </div>
           </div>
         ) : (
           <div className="text-center py-8 w-full animate-fadeIn">
-            <Target size={32} className="mx-auto text-slate-400 dark:text-zinc-600 mb-2" />
-            <p className="text-slate-600 dark:text-zinc-400 font-bold mb-1">Define un objetivo</p>
-            <p className="text-xs text-slate-500 dark:text-zinc-500 mb-4">Establece una meta de ingresos para ver tu progreso aquí.</p>
+            <Zap size={32} className="mx-auto text-slate-400 dark:text-zinc-600 mb-2" />
+            <p className="text-slate-600 dark:text-zinc-400 font-bold mb-1">Define una Cuota</p>
+            <p className="text-xs text-slate-500 dark:text-zinc-500 mb-4">Establece un objetivo de producción para optimizar resultados.</p>
             <button
               onClick={() => navigateTo('settings')}
-              className="flex items-center gap-2 mx-auto px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-full hover:scale-105 transition-transform"
+              className="flex items-center gap-2 mx-auto px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-full hover:scale-105 transition-transform uppercase tracking-widest"
             >
               <Settings size={14} />
-              Ir a Configuración
+              Configurar Meta
             </button>
           </div>
         )}
@@ -280,12 +272,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
       <div className="grid grid-cols-2 gap-4">
         <StatsCard title="HOY" value={`$${stats.todayTotal}`} icon={<Zap size={24} />} />
         <StatsCard title="ESTE MES" value={`$${stats.monthTotal}`} color="text-emerald-600 dark:text-emerald-400" icon={<Calendar size={24} />} />
-        <StatsCard title="TOTAL AÑO" value={`$${stats.allTotal}`} color="text-violet-600 dark:text-violet-400" icon={<DollarSign size={24} />} />
-         <StatsCard title="ACTIVIDADES" value={records.length} color="text-amber-600 dark:text-amber-400" icon={<Signal size={24} />} />
+        <StatsCard title="TOTAL ACUMULADO" value={`$${stats.allTotal}`} color="text-violet-600 dark:text-violet-400" icon={<DollarSign size={24} />} />
+         <StatsCard title="REGISTROS" value={records.length} color="text-amber-600 dark:text-amber-400" icon={<Binary size={24} />} />
       </div>
 
       <div className="glass-panel rounded-3xl p-6">
-        <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-6">INGRESOS (7 DÍAS)</h3>
+        <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-6 flex items-center gap-2">
+          <Activity size={14} className="text-cyan-500" /> TRÁFICO DE PRODUCCIÓN (7D)
+        </h3>
         <div className="w-full h-56 min-h-[224px] relative">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
@@ -319,7 +313,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
       </div>
 
       <div className="glass-panel rounded-3xl p-6 flex flex-col items-center">
-         <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-2 self-start">DISTRIBUCIÓN</h3>
+         <h3 className="text-slate-500 dark:text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-2 self-start">ANÁLISIS DE RED</h3>
          {pieData.length > 0 ? (
            <div className="w-full h-56 min-h-[224px] relative">
               <ResponsiveContainer width="100%" height="100%">
@@ -334,11 +328,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ records, username, setting
               </ResponsiveContainer>
            </div>
          ) : (
-           <div className="w-full h-56 flex items-center justify-center text-slate-400 dark:text-zinc-600 text-xs italic">
-             No hay datos de {roleLabel.toLowerCase()}
+           <div className="w-full h-56 flex items-center justify-center text-slate-400 dark:text-zinc-600 text-xs italic uppercase">
+             Sin datos de paquetes disponibles
            </div>
          )}
-         <div className="flex flex-wrap justify-center gap-2 mt-2 text-xs font-medium">
+         <div className="flex flex-wrap justify-center gap-2 mt-2 text-[10px] font-bold uppercase tracking-widest">
             {pieData.map(d => (
               <div key={d.name} className="flex items-center gap-1.5 bg-white/50 dark:bg-white/5 px-3 py-1 rounded-full border border-white/20 dark:border-white/5">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />

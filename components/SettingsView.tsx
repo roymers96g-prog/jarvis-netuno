@@ -6,7 +6,7 @@ import { exportBackupData, importBackupData, generateCSV, wipeUserData } from '.
 import { validateApiKey } from '../services/geminiService';
 import { getEffectiveApiKey } from '../services/settingsService';
 import { ConfirmationModal } from './ConfirmationModal';
-import { Volume2, VolumeX, Moon, Sun, Save, Share2, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet, HardHat, Wrench, Trash2, AlertTriangle, Eye, EyeOff, Plus, Minus } from 'lucide-react';
+import { Moon, Sun, Save, Settings as SettingsIcon, DollarSign, CheckCircle, XCircle, Download, Upload, User, Mic, Play, Key, Activity, Loader2, Target, FileSpreadsheet, HardHat, Cpu, Trash2, AlertTriangle, Eye, EyeOff, Plus, Minus, Zap, Globe, ShieldCheck, SunMedium } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -18,7 +18,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const [isSaved, setIsSaved] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing' | 'validating'>('checking');
   const [apiErrorMsg, setApiErrorMsg] = useState<string>('');
-  const [showApiKey, setShowApiKey] = useState(false); // Estado para visibilidad
+  const [showApiKey, setShowApiKey] = useState(false); 
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showWipeModal, setShowWipeModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +48,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   }, []);
 
   const handleChangePrice = (type: InstallType, val: string) => {
-    // Permitir borrar el valor (string vacío se convierte en 0)
     const num = parseFloat(val);
     setLocalSettings(prev => ({
       ...prev,
@@ -74,7 +73,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   };
 
   const cleanApiKey = (key: string) => {
-    // Limpieza agresiva en frontend (espacios, saltos, caracteres invisibles)
     return key ? key.trim().replace(/[\r\n\s\u200B-\u200D\uFEFF]/g, '') : '';
   };
 
@@ -92,7 +90,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     const rawKey = localSettings.apiKey || "";
     const key = cleanApiKey(rawKey);
     
-    // Actualizamos visualmente para que el usuario vea que se limpió
     if (key !== rawKey) {
         setLocalSettings(p => ({ ...p, apiKey: key }));
     }
@@ -105,7 +102,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     setApiKeyStatus('validating');
     setApiErrorMsg('');
     
-    // Guardamos temporalmente
     onSave({ ...localSettings, apiKey: key }); 
     
     const result = await validateApiKey(key);
@@ -113,17 +109,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     if (result.valid) {
       setApiKeyStatus('ok');
       setApiErrorMsg('');
-      alert("✅ ¡Conexión Exitosa! La IA está operativa.");
+      alert("✅ Conexión establecida con el núcleo de IA.");
     } else {
       setApiKeyStatus('missing');
-      setApiErrorMsg(result.error || "Error desconocido");
-      alert(result.error || "Error al conectar con Gemini");
+      setApiErrorMsg(result.error || "Error de red");
+      alert(result.error || "Error al conectar con la infraestructura de IA");
     }
   };
 
   const handleTestVoice = () => {
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance("Hola señor. Los sistemas están operando al cien por ciento.");
+    const utterance = new SpeechSynthesisUtterance("Sistemas calibrados. Listo para la siguiente fase de producción.");
     utterance.lang = 'es-ES';
     utterance.pitch = localSettings.voiceSettings.pitch;
     utterance.rate = localSettings.voiceSettings.rate;
@@ -134,20 +130,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     }
     
     window.speechSynthesis.speak(utterance);
-  };
-
-  const handleShare = async () => {
-    const shareData = {
-      title: 'Netuno Jarvis Tracker',
-      text: 'Lleva el control de tus instalaciones de Netuno con IA.',
-      url: window.location.origin
-    };
-    if (navigator.share) {
-      try { await navigator.share(shareData); } catch (err) { console.log('Error sharing', err); }
-    } else {
-      navigator.clipboard.writeText(window.location.origin);
-      alert("Enlace copiado.");
-    }
   };
 
   const handleExportJSON = () => {
@@ -163,7 +145,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
   const handleExportCSV = () => {
     const csvContent = generateCSV();
     if (!csvContent) {
-      alert("No hay datos para exportar.");
+      alert("No hay registros disponibles.");
       return;
     }
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -188,10 +170,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
       if (content) {
         const success = importBackupData(content);
         if (success) {
-          alert('¡Copia de seguridad restaurada correctamente! La página se recargará.');
+          alert('Datos restaurados correctamente. Reiniciando terminal...');
           window.location.reload();
         } else {
-          alert('Error: El archivo no es válido.');
+          alert('Error: Archivo de datos corrupto o no válido.');
         }
       }
     };
@@ -205,23 +187,68 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
     window.location.reload();
   };
 
-  // Group prices by profile
   const installerTypes = [InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE, InstallType.SERVICE];
-  const technicianTypes = [InstallType.SERVICE_BASIC, InstallType.SERVICE_REWIRING, InstallType.SERVICE_CORP];
+  const technicianTypes = [
+    InstallType.SERVICE_BASIC, 
+    InstallType.SERVICE_CORP, 
+    InstallType.SERVICE_REWIRING,
+    InstallType.SERVICE_REWIRING_CORP,
+    InstallType.SERVICE_REWIRING_PPAL,
+    InstallType.SERVICE_REWIRING_AYUDANTE,
+    InstallType.SERVICE_RELOCATION
+  ];
 
   return (
     <div className="space-y-8 animate-fadeIn">
       <header className="flex flex-col gap-2 pb-4">
         <h2 className="text-xl font-bold dark:text-white text-slate-800 tracking-wide flex items-center gap-2">
           <SettingsIcon className="text-cyan-600 dark:text-zinc-400" size={24} />
-          CONFIGURACIÓN
+          NÚCLEO DE CONTROL
         </h2>
-        <p className="dark:text-zinc-500 text-slate-500 text-sm">Personaliza tu experiencia.</p>
+        <p className="dark:text-zinc-500 text-slate-500 text-sm uppercase tracking-widest font-bold">Ajustes de Terminal</p>
       </header>
 
-      {/* System Status & API Key */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">CONEXIÓN IA</h3>
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] dark:text-zinc-600 text-slate-400 mb-2">Preferencias de Campo</h3>
+        
+        {/* Recomendación 5: Modo Alta Visibilidad */}
+        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl border border-white/5">
+          <div className="flex items-center gap-3">
+            <SunMedium className={localSettings.highContrast ? 'text-yellow-500' : 'text-slate-400'} />
+            <div>
+              <span className="block font-bold dark:text-white text-slate-800 text-sm uppercase tracking-widest">Modo Exteriores</span>
+              <span className="text-[10px] dark:text-zinc-500 text-slate-500 uppercase font-bold">Alta Visibilidad / Contraste</span>
+            </div>
+          </div>
+          <button 
+            onClick={() => setLocalSettings(p => ({ ...p, highContrast: !p.highContrast }))}
+            className={`w-12 h-7 rounded-full p-1 transition-colors ${localSettings.highContrast ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]' : 'bg-slate-300 dark:bg-zinc-700'}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white transform transition-transform ${localSettings.highContrast ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl border border-white/5">
+          <div className="flex items-center gap-3">
+            {localSettings.theme === 'dark' ? <Moon className="text-zinc-400" /> : <Sun className="text-amber-500" />}
+            <div>
+              <span className="block font-bold dark:text-white text-slate-800 text-sm uppercase tracking-widest">Tema de Interfaz</span>
+              <span className="text-[10px] dark:text-zinc-500 text-slate-500 uppercase font-bold">
+                {localSettings.theme === 'dark' ? 'Modo Oscuro' : 'Modo Claro'}
+              </span>
+            </div>
+          </div>
+          <button 
+            onClick={() => setLocalSettings(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
+            className={`w-12 h-7 rounded-full p-1 transition-colors ${localSettings.theme === 'dark' ? 'bg-zinc-700' : 'bg-cyan-200'}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white transform transition-transform ${localSettings.theme === 'dark' ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] dark:text-zinc-600 text-slate-400 mb-2">Conectividad IA</h3>
         
         <div className={`flex flex-col p-4 rounded-2xl border shadow-sm glass-panel transition-colors ${
           apiKeyStatus === 'ok' ? 'border-emerald-500/20' : 'border-red-500/20'
@@ -231,33 +258,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
               {apiKeyStatus === 'validating' ? (
                  <Loader2 className="animate-spin text-cyan-500" />
               ) : apiKeyStatus === 'ok' ? (
-                 <CheckCircle className="text-emerald-500" /> 
+                 <ShieldCheck className="text-emerald-500" /> 
               ) : (
-                 <XCircle className="text-red-500" />
+                 <AlertTriangle className="text-red-500" />
               )}
               <div>
-                <span className={`block font-bold text-sm ${apiKeyStatus === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : apiKeyStatus === 'validating' ? 'text-cyan-500' : 'text-red-600'}`}>
-                  IA Gemini
+                <span className={`block font-bold text-sm uppercase tracking-widest ${apiKeyStatus === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : apiKeyStatus === 'validating' ? 'text-cyan-500' : 'text-red-600'}`}>
+                  NÚCLEO GEMINI
                 </span>
-                <span className="text-[10px] dark:text-zinc-500 text-slate-500">
-                  {apiKeyStatus === 'ok' ? 'Listo para usar' : apiKeyStatus === 'validating' ? 'Verificando...' : 'Sin conexión'}
+                <span className="text-[10px] dark:text-zinc-500 text-slate-500 font-mono">
+                  {apiKeyStatus === 'ok' ? 'ENLACE ESTABLE' : apiKeyStatus === 'validating' ? 'VERIFICANDO ENLACE...' : 'SIN SEÑAL'}
                 </span>
               </div>
             </div>
-            <div className={`w-2 h-2 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+            <div className={`w-2 h-2 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`} />
           </div>
 
-          <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-3 mb-3">
+          <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-3 mb-3 border border-white/5">
             <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-2">
-                    <Key size={12} /> Google Gemini API Key
+                <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-2 uppercase tracking-widest">
+                    <Key size={12} /> Access API Key
                 </label>
                 <button 
                     onClick={() => setShowApiKey(!showApiKey)}
-                    className="text-cyan-600 dark:text-cyan-400 text-xs font-bold flex items-center gap-1 hover:opacity-80"
+                    className="text-cyan-600 dark:text-cyan-400 text-[10px] font-bold flex items-center gap-1 hover:opacity-80 uppercase"
                 >
                     {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                    {showApiKey ? 'Ocultar' : 'Ver Llave'}
+                    {showApiKey ? 'Ocultar' : 'Revelar'}
                 </button>
             </div>
             
@@ -265,43 +292,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
               type={showApiKey ? "text" : "password"}
               value={localSettings.apiKey}
               onChange={(e) => setLocalSettings(p => ({ ...p, apiKey: e.target.value }))}
-              placeholder={getEffectiveApiKey() ? "Usando variable de entorno (Oculta)" : "Pega tu llave aquí..."}
-              className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-sm dark:text-white text-slate-900 pb-2 placeholder:text-slate-400 font-mono tracking-tight"
+              placeholder={getEffectiveApiKey() ? "ENCRIPTADA Y SEGURA" : "Pega llave de acceso..."}
+              className="w-full bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-sm dark:text-white text-slate-900 pb-2 placeholder:text-slate-400 font-mono tracking-wider"
             />
-            
-            {apiErrorMsg && (
-              <div className="flex items-start gap-2 mt-2 bg-red-500/10 p-2 rounded text-[11px] text-red-600 dark:text-red-400 font-bold border border-red-500/20">
-                 <AlertTriangle size={14} className="min-w-[14px] mt-0.5" />
-                 <span>{apiErrorMsg}</span>
-              </div>
-            )}
           </div>
 
           <button 
             onClick={handleTestApiKey}
             disabled={!localSettings.apiKey && !getEffectiveApiKey() || apiKeyStatus === 'validating'}
-            className="w-full py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 uppercase tracking-widest"
           >
-            {apiKeyStatus === 'validating' ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
-            PROBAR Y GUARDAR LLAVE
+            {apiKeyStatus === 'validating' ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+            Calibrar Conexión
           </button>
         </div>
       </section>
 
-      {/* Profile Section */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PERFIL Y ROL</h3>
-        <div className="p-4 glass-panel rounded-2xl space-y-4">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] dark:text-zinc-600 text-slate-400 mb-2">Módulo de Operación</h3>
+        <div className="p-4 glass-panel rounded-2xl space-y-4 border border-white/5">
           <div className="flex items-center gap-3 border-b border-slate-200 dark:border-white/5 pb-4">
             <User className="text-cyan-600 dark:text-zinc-400" />
             <div className="flex-1">
-              <span className="block font-bold dark:text-white text-slate-800 text-sm">Nombre de Usuario</span>
+              <span className="block font-bold dark:text-white text-slate-800 text-sm uppercase tracking-widest">Identificador</span>
               <input 
                  type="text"
                  value={localSettings.nickname}
                  onChange={(e) => setLocalSettings(p => ({ ...p, nickname: e.target.value }))}
-                 className="w-full bg-transparent border-none outline-none text-xs dark:text-zinc-400 text-slate-500 font-medium placeholder:text-slate-400"
-                 placeholder="Tu nombre"
+                 className="w-full bg-transparent border-none outline-none text-xs dark:text-zinc-400 text-slate-500 font-medium placeholder:text-slate-400 uppercase tracking-wider"
+                 placeholder="Técnico Netuno"
               />
             </div>
           </div>
@@ -309,111 +328,69 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
           <div className="grid grid-cols-2 gap-3">
              <button
                 onClick={() => setLocalSettings(p => ({ ...p, profile: 'INSTALLER' }))}
-                className={`p-3 rounded-lg border flex flex-col items-center gap-1 transition-all ${localSettings.profile === 'INSTALLER' ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
+                className={`p-3 rounded-lg border flex flex-col items-center gap-1 transition-all ${localSettings.profile === 'INSTALLER' ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
              >
                 <HardHat size={20} />
-                <span className="text-[10px] font-bold">INSTALADOR</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Instalación</span>
              </button>
              <button
                 onClick={() => setLocalSettings(p => ({ ...p, profile: 'TECHNICIAN' }))}
-                className={`p-3 rounded-lg border flex flex-col items-center gap-1 transition-all ${localSettings.profile === 'TECHNICIAN' ? 'bg-violet-500/10 border-violet-500/50 text-violet-600 dark:text-violet-400' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
+                className={`p-3 rounded-lg border flex flex-col items-center gap-1 transition-all ${localSettings.profile === 'TECHNICIAN' ? 'bg-violet-500/10 border-violet-500/50 text-violet-600 dark:text-white' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-400'}`}
              >
-                <Wrench size={20} />
-                <span className="text-[10px] font-bold">TÉCNICO</span>
+                <Cpu size={20} />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Servicios</span>
              </button>
           </div>
         </div>
       </section>
       
-      {/* Price Settings */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PRECIOS - INSTALACIONES</h3>
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] dark:text-zinc-600 text-slate-400 mb-2">Tarifas de Red - Instalaciones</h3>
         <div className="grid gap-3">
           {installerTypes.map((type) => (
-            <div key={type} className="flex items-center justify-between p-3 glass-panel rounded-2xl">
-              <span className="font-bold dark:text-zinc-300 text-slate-700 text-sm">{LABELS[type]}</span>
+            <div key={type} className="flex items-center justify-between p-3 glass-panel rounded-2xl border border-white/5">
+              <span className="font-bold dark:text-zinc-300 text-slate-700 text-xs uppercase tracking-wider">{LABELS[type]}</span>
               
               <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-800 rounded-xl p-1">
-                <button 
-                  onClick={() => adjustPrice(type, -1)}
-                  className="p-2 text-slate-500 hover:text-cyan-600 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                >
-                  <Minus size={16} />
-                </button>
-                
+                <button onClick={() => adjustPrice(type, -1)} className="p-2 text-slate-500 hover:text-cyan-600 rounded-lg"><Minus size={16} /></button>
                 <div className="relative w-16">
-                    <DollarSign size={12} className="absolute left-1 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    <input 
-                      type="number" 
-                      value={localSettings.customPrices[type] === 0 ? '' : localSettings.customPrices[type]}
-                      onChange={(e) => handleChangePrice(type, e.target.value)}
-                      placeholder="0"
-                      className="w-full bg-transparent text-center font-mono font-bold text-lg dark:text-white text-slate-900 outline-none pl-3 appearance-none"
-                    />
+                    <DollarSign size={10} className="absolute left-1 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input type="number" value={localSettings.customPrices[type] === 0 ? '' : localSettings.customPrices[type]} onChange={(e) => handleChangePrice(type, e.target.value)} placeholder="0" className="w-full bg-transparent text-center font-mono font-bold text-lg dark:text-white outline-none pl-3" />
                 </div>
-
-                <button 
-                  onClick={() => adjustPrice(type, 1)}
-                  className="p-2 text-slate-500 hover:text-cyan-600 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                >
-                  <Plus size={16} />
-                </button>
+                <button onClick={() => adjustPrice(type, 1)} className="p-2 text-slate-500 hover:text-cyan-600 rounded-lg"><Plus size={16} /></button>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Technician Settings */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PRECIOS - SERVICIO TÉCNICO</h3>
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] dark:text-zinc-600 text-slate-400 mb-2">Tarifas de Red - Soporte Técnico</h3>
         <div className="grid gap-3">
           {technicianTypes.map((type) => (
-            <div key={type} className="flex items-center justify-between p-3 glass-panel rounded-2xl border-l-4 border-l-orange-500/50">
-              <span className="font-bold dark:text-zinc-300 text-slate-700 text-sm">{LABELS[type]}</span>
-              
+            <div key={type} className="flex items-center justify-between p-3 glass-panel rounded-2xl border-l-4 border-white/5" style={{ borderLeftColor: type.includes('REWIRING') ? '#f472b6' : '#fb923c' }}>
+              <span className="font-bold dark:text-zinc-300 text-slate-700 text-[10px] uppercase tracking-wider">{LABELS[type]}</span>
               <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-800 rounded-xl p-1">
-                <button 
-                  onClick={() => adjustPrice(type, -1)}
-                  className="p-2 text-slate-500 hover:text-orange-600 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                >
-                  <Minus size={16} />
-                </button>
-                
+                <button onClick={() => adjustPrice(type, -1)} className="p-2 text-slate-500 hover:text-orange-600 rounded-lg"><Minus size={16} /></button>
                 <div className="relative w-16">
-                    <DollarSign size={12} className="absolute left-1 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    <input 
-                      type="number" 
-                      value={localSettings.customPrices[type] === 0 ? '' : localSettings.customPrices[type]}
-                      onChange={(e) => handleChangePrice(type, e.target.value)}
-                      placeholder="0"
-                      className="w-full bg-transparent text-center font-mono font-bold text-lg dark:text-white text-slate-900 outline-none pl-3 appearance-none"
-                    />
+                    <DollarSign size={10} className="absolute left-1 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input type="number" value={localSettings.customPrices[type] === 0 ? '' : localSettings.customPrices[type]} onChange={(e) => handleChangePrice(type, e.target.value)} placeholder="0" className="w-full bg-transparent text-center font-mono font-bold text-lg dark:text-white outline-none pl-3" />
                 </div>
-
-                <button 
-                  onClick={() => adjustPrice(type, 1)}
-                  className="p-2 text-slate-500 hover:text-orange-600 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                >
-                  <Plus size={16} />
-                </button>
+                <button onClick={() => adjustPrice(type, 1)} className="p-2 text-slate-500 hover:text-orange-600 rounded-lg"><Plus size={16} /></button>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Goal Section */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">METAS DE PRODUCCIÓN</h3>
-        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] dark:text-zinc-600 text-slate-400 mb-2">Objetivo de Tráfico</h3>
+        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl border border-white/5">
           <div className="flex items-center gap-3">
             <Target className="text-emerald-500 dark:text-emerald-400" />
             <div>
-              <span className="block font-bold dark:text-white text-slate-800 text-sm">Meta Mensual</span>
-              <span className="text-[10px] dark:text-zinc-500 text-slate-500">
-                Tu objetivo de ingresos
-              </span>
+              <span className="block font-bold dark:text-white text-slate-800 text-sm uppercase tracking-widest">CUOTA MENSUAL</span>
+              <span className="text-[10px] dark:text-zinc-500 text-slate-500 font-bold uppercase">Meta de Ingresos</span>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -423,206 +400,82 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave }) 
                value={localSettings.monthlyGoal > 0 ? localSettings.monthlyGoal : ''}
                onChange={(e) => setLocalSettings(p => ({ ...p, monthlyGoal: parseFloat(e.target.value) || 0 }))}
                placeholder="0"
-               className="w-24 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-medium text-lg dark:text-white text-slate-900"
+               className="w-24 bg-transparent border-b border-slate-300 dark:border-zinc-700 focus:border-cyan-500 outline-none text-right font-mono font-bold text-lg dark:text-white text-slate-900"
             />
           </div>
         </div>
       </section>
 
-      {/* Voice Settings Section */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">SINTETIZADOR DE VOZ</h3>
-        <div className="glass-panel p-4 rounded-2xl space-y-4">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] dark:text-zinc-600 text-slate-400 mb-2">Sintetizador Neural</h3>
+        <div className="glass-panel p-4 rounded-2xl space-y-4 border border-white/5">
            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Mic className="text-cyan-500" />
                 <div>
-                  <span className="block font-bold dark:text-white text-slate-800 text-sm">Voz de Jarvis</span>
-                  <span className="text-[10px] dark:text-zinc-500 text-slate-500">Selecciona la voz más parecida</span>
+                  <span className="block font-bold dark:text-white text-slate-800 text-sm uppercase tracking-widest">Protocolo de Voz</span>
+                  <span className="text-[10px] dark:text-zinc-500 text-slate-500 uppercase font-bold">Respuesta del Asistente</span>
                 </div>
               </div>
               <button 
                 onClick={() => setLocalSettings(p => ({ ...p, ttsEnabled: !p.ttsEnabled }))}
-                className={`w-12 h-7 rounded-full p-1 transition-colors ${localSettings.ttsEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-zinc-700'}`}
+                className={`w-12 h-7 rounded-full p-1 transition-colors ${localSettings.ttsEnabled ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-300 dark:bg-zinc-700'}`}
               >
-                <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${localSettings.ttsEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                <div className={`w-5 h-5 rounded-full bg-white transform transition-transform ${localSettings.ttsEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
            </div>
-
-           {localSettings.ttsEnabled && (
-             <div className="space-y-4 pt-2 border-t border-slate-200 dark:border-zinc-700">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 dark:text-zinc-400">Selección de Voz</label>
-                  <select 
-                    value={localSettings.voiceSettings.voiceURI}
-                    onChange={(e) => setLocalSettings(p => ({ ...p, voiceSettings: { ...p.voiceSettings, voiceURI: e.target.value } }))}
-                    className="w-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg p-2 text-sm dark:text-white"
-                  >
-                    <option value="">Automático (Recomendado)</option>
-                    {availableVoices.map(v => (
-                      <option key={v.voiceURI} value={v.voiceURI}>
-                        {v.name} ({v.lang})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 dark:text-zinc-400">Tono (Pitch): {localSettings.voiceSettings.pitch}</label>
-                    <input 
-                      type="range" min="0.5" max="2" step="0.1"
-                      value={localSettings.voiceSettings.pitch}
-                      onChange={(e) => setLocalSettings(p => ({ ...p, voiceSettings: { ...p.voiceSettings, pitch: parseFloat(e.target.value) } }))}
-                      className="w-full accent-cyan-500"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 dark:text-zinc-400">Velocidad: {localSettings.voiceSettings.rate}</label>
-                    <input 
-                      type="range" min="0.5" max="2" step="0.1"
-                      value={localSettings.voiceSettings.rate}
-                      onChange={(e) => setLocalSettings(p => ({ ...p, voiceSettings: { ...p.voiceSettings, rate: parseFloat(e.target.value) } }))}
-                      className="w-full accent-cyan-500"
-                    />
-                  </div>
-                </div>
-
-                <button 
-                  onClick={handleTestVoice}
-                  className="w-full py-2 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-colors text-slate-700 dark:text-zinc-300"
-                >
-                  <Play size={14} /> PROBAR VOZ
-                </button>
-             </div>
-           )}
         </div>
       </section>
 
-      {/* Preferences Section */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">PREFERENCIAS VISUALES</h3>
-        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl">
-          <div className="flex items-center gap-3">
-            {localSettings.theme === 'dark' ? <Moon className="text-zinc-400" /> : <Sun className="text-amber-500" />}
-            <div>
-              <span className="block font-bold dark:text-white text-slate-800 text-sm">Modo Oscuro</span>
-              <span className="text-[10px] dark:text-zinc-500 text-slate-500">
-                {localSettings.theme === 'dark' ? 'Negro Elegante' : 'Azul Cristal'}
-              </span>
-            </div>
-          </div>
-          <button 
-            onClick={() => setLocalSettings(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
-            className={`w-12 h-7 rounded-full p-1 transition-colors ${localSettings.theme === 'dark' ? 'bg-zinc-700' : 'bg-cyan-200'}`}
-          >
-            <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${localSettings.theme === 'dark' ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
-        </div>
-      </section>
-
-      {/* Data Management Section (Export/Import) */}
-      <section className="space-y-3">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest dark:text-zinc-600 text-slate-400 mb-2">GESTIÓN DE DATOS</h3>
-        
-        {/* Export Options */}
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] dark:text-zinc-600 text-slate-400 mb-2">Gestión de Paquetes</h3>
         <div className="grid grid-cols-2 gap-3">
             <button 
               onClick={handleExportCSV}
-              className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-emerald-50/10 transition-colors group"
+              className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-emerald-50/10 transition-colors group border border-white/5"
             >
               <FileSpreadsheet size={24} className="text-emerald-600 group-hover:scale-110 transition-transform" />
               <div className="text-center">
-                <span className="block text-xs font-bold dark:text-zinc-300 text-slate-600">Reporte Excel</span>
-                <span className="text-[9px] text-slate-400">Formato CSV legible</span>
+                <span className="block text-[10px] font-bold dark:text-zinc-300 text-slate-600 uppercase tracking-widest">Reporte CSV</span>
+                <span className="text-[9px] text-slate-400 font-mono">NETUNO_DATA.csv</span>
               </div>
             </button>
 
             <button 
               onClick={handleExportJSON}
-              className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-blue-50/10 transition-colors group"
+              className="flex flex-col items-center justify-center gap-2 p-4 glass-panel rounded-2xl hover:bg-blue-50/10 transition-colors group border border-white/5"
             >
-              <Download size={24} className="text-blue-500 group-hover:scale-110 transition-transform" />
+              <Globe size={24} className="text-blue-500 group-hover:scale-110 transition-transform" />
               <div className="text-center">
-                <span className="block text-xs font-bold dark:text-zinc-300 text-slate-600">Backup Completo</span>
-                <span className="text-[9px] text-slate-400">Archivo JSON técnico</span>
+                <span className="block text-[10px] font-bold dark:text-zinc-300 text-slate-600 uppercase tracking-widest">Backup Cloud</span>
+                <span className="text-[9px] text-slate-400 font-mono">NETUNO_CORE.json</span>
               </div>
             </button>
         </div>
-
-        {/* Import Option */}
-        <button 
-          onClick={handleImportClick}
-          className="w-full flex items-center justify-center gap-2 p-3 mt-2 glass-panel rounded-xl hover:bg-white/5 transition-colors border-dashed border-slate-400/30"
-        >
-          <Upload size={16} className="text-slate-400" />
-          <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Restaurar copia de seguridad (JSON)</span>
-        </button>
-        
-        <input 
-          type="file" 
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept=".json"
-          className="hidden" 
-        />
       </section>
 
-      {/* DANGER ZONE */}
       <section className="space-y-3 pt-6 border-t border-red-500/20">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-red-500 mb-2 flex items-center gap-2">
-          <AlertTriangle size={12} /> ZONA DE PELIGRO
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500 mb-2 flex items-center gap-2">
+          <AlertTriangle size={12} /> Purga de Sistema
         </h3>
         <div className="p-4 rounded-2xl bg-red-500/5 border border-red-500/20 flex items-center justify-between">
           <div>
-            <span className="block font-bold dark:text-red-200 text-red-800 text-sm">Borrar Todos los Datos</span>
-            <span className="text-[10px] text-red-500/70 block max-w-[200px] leading-tight mt-1">
-              Elimina registros locales y de la nube. Irreversible.
-            </span>
+            <span className="block font-bold dark:text-red-200 text-red-800 text-sm uppercase tracking-widest">Borrado Maestro</span>
+            <span className="text-[10px] text-red-500/70 block mt-1 uppercase font-bold">Eliminación permanente de registros.</span>
           </div>
-          <button 
-            onClick={() => setShowWipeModal(true)}
-            className="p-3 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-lg shadow-red-500/20 transition-all hover:scale-105"
-          >
+          <button onClick={() => setShowWipeModal(true)} className="p-3 bg-red-500 text-white rounded-xl shadow-lg transition-all hover:scale-105 active:rotate-12">
             <Trash2 size={18} />
           </button>
         </div>
       </section>
 
-      {/* Share Section */}
-      <section className="space-y-3">
-         <button 
-            onClick={handleShare}
-            className="w-full py-4 flex items-center justify-center gap-2 glass-panel border-dashed border-slate-300 dark:border-zinc-700 rounded-2xl text-cyan-700 dark:text-zinc-400 hover:bg-cyan-50/50 dark:hover:bg-white/5 transition-colors"
-         >
-           <Share2 size={18} />
-           <span className="font-bold text-sm">Compartir App</span>
-         </button>
-      </section>
-
-      {/* Save Button */}
-      <div className="fixed bottom-24 left-0 right-0 px-4 flex justify-center z-40 pointer-events-none">
-        <button 
-          onClick={handleSave}
-          className={`pointer-events-auto flex items-center gap-2 px-8 py-3 rounded-full font-bold shadow-xl transition-all transform ${
-            isSaved 
-            ? 'bg-emerald-500 text-white scale-105' 
-            : 'bg-black dark:bg-white text-white dark:text-black hover:scale-105'
-          }`}
-        >
-          <Save size={18} />
-          {isSaved ? 'GUARDADO' : 'GUARDAR TODO'}
+      <div className="fixed bottom-24 left-0 right-0 px-4 flex justify-center z-40 pointer-events-none no-print">
+        <button onClick={handleSave} className={`pointer-events-auto flex items-center gap-2 px-8 py-3 rounded-full font-bold shadow-xl transition-all transform uppercase tracking-[0.3em] text-xs ${isSaved ? 'bg-emerald-500 text-white scale-105' : 'bg-black dark:bg-white text-white dark:text-black hover:scale-105'}`}>
+          <Save size={18} /> {isSaved ? 'SINCRONIZADO' : 'Sincronizar Todo'}
         </button>
       </div>
 
-      <ConfirmationModal 
-        isOpen={showWipeModal}
-        onClose={() => setShowWipeModal(false)}
-        onConfirm={handleWipeData}
-        title="¿ESTÁS SEGURO?"
-        message="Esta acción eliminará permanentemente todos tus registros de instalación tanto de este dispositivo como de la nube. No se puede deshacer."
-      />
-      
+      <ConfirmationModal isOpen={showWipeModal} onClose={() => setShowWipeModal(false)} onConfirm={handleWipeData} title="ALERTA DE PURGA" message="Esta acción eliminará permanentemente todos tus registros de la red Netuno. El protocolo no es reversible." />
       <div className="h-24"></div>
     </div>
   );

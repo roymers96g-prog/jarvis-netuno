@@ -1,10 +1,10 @@
 
-import { GoogleGenAI, Type, Schema, Chat, GenerateContentResponse } from "@google/genai";
+// Use correct imports from @google/genai, excluding deprecated or unavailable types
+import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { InstallType, InstallationRecord, ExtractedData } from "../types";
-import { getAllPrices, getEffectiveApiKey, getSettings } from "./settingsService";
+import { getEffectiveApiKey, getSettings } from "./settingsService";
 
 let chat: Chat | null = null;
-let currentModelUsed = "gemini-2.5-flash"; 
 
 const cleanApiKey = (key: string) => {
   return key ? key.trim().replace(/[\r\n\s\u200B-\u200D\uFEFF]/g, '') : '';
@@ -12,13 +12,13 @@ const cleanApiKey = (key: string) => {
 
 const getAiInstance = (): GoogleGenAI => {
   const apiKey = cleanApiKey(getEffectiveApiKey());
-  if (!apiKey || apiKey.length < 10) {
-    throw new Error("API Key faltante o inválida");
-  }
+  if (!apiKey) throw new Error("API Key faltante");
+  // Always initialize with a named parameter
   return new GoogleGenAI({ apiKey });
 };
 
-const RESPONSE_SCHEMA: Schema = {
+// Define response schema for structured output using correct Type enum
+const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     intent: {
@@ -28,16 +28,12 @@ const RESPONSE_SCHEMA: Schema = {
     },
     records: {
       type: Type.ARRAY,
-      description: "Registros a guardar o identificar.",
       items: {
         type: Type.OBJECT,
         properties: {
           type: {
             type: Type.STRING,
-            enum: [
-              InstallType.RESIDENTIAL, InstallType.CORPORATE, InstallType.POSTE, InstallType.SERVICE,
-              InstallType.SERVICE_BASIC, InstallType.SERVICE_REWIRING, InstallType.SERVICE_CORP
-            ]
+            enum: Object.values(InstallType)
           },
           quantity: { type: Type.INTEGER },
           date: { type: Type.STRING }
@@ -48,21 +44,20 @@ const RESPONSE_SCHEMA: Schema = {
     deletionTarget: {
       type: Type.OBJECT,
       properties: {
-        last: { type: Type.BOOLEAN, description: "Si el usuario quiere borrar el último registro realizado." },
-        type: { type: Type.STRING, description: "El tipo específico de registro a borrar." },
-        date: { type: Type.STRING, description: "Fecha del registro a borrar." }
+        last: { type: Type.BOOLEAN },
+        type: { type: Type.STRING },
+        date: { type: Type.STRING }
       }
     },
     jarvisResponse: {
       type: Type.STRING,
-      description: "Respuesta concisa y profesional."
+      description: "Respuesta concisa y profesional del asistente Jarvis."
     }
   },
   required: ["intent", "records", "jarvisResponse"]
 };
 
 const getSystemInstruction = () => {
-    const prices = getAllPrices();
     const settings = getSettings();
     const role = settings.profile === 'TECHNICIAN' ? 'Técnico de Servicio' : 'Instalador de Fibra';
 
@@ -70,23 +65,30 @@ const getSystemInstruction = () => {
       Eres Jarvis, un asistente de IA para Netuno. Usuario: ${role}.
       
       INTENCIONES:
-      1. LOGGING: Registrar nueva producción.
-      2. QUERY: Consultar estadísticas.
-      3. GENERAL_CHAT: Saludos o ayuda.
-      4. DELETION: Si el usuario pide "borra", "elimina" o "quita" algo que ya registró.
-         - Si el usuario dice "borra el último", marca deletionTarget.last = true.
-         - Si dice "borra la residencial de hoy", identifica el tipo y la fecha.
+      1. LOGGING: Registrar producción. Tipos válidos: RESIDENTIAL, CORPORATE, POSTE, SERVICE_BASIC, SERVICE_CORP, SERVICE_REWIRING_CORP, SERVICE_REWIRING_PPAL, SERVICE_REWIRING_AYUDANTE, SERVICE_RELOCATION, SERVICE_REWIRING.
       
-      IMPORTANTE: Nunca borres tú directamente. Tu respuesta (jarvisResponse) para DELETION debe ser una confirmación tipo: "Entendido, he localizado el registro. Por seguridad, confírmalo en pantalla."
+      REFERENCIAS TÉCNICAS Y MAPEO:
+      - "Recableado Corporativo" o "Recableado Corp" -> SERVICE_REWIRING_CORP
+      - "Recableado Principal" o "Recableado Ppal" o "Ppal" -> SERVICE_REWIRING_PPAL
+      - "Recableado Ayudante" o "Ayudante" -> SERVICE_REWIRING_AYUDANTE
+      - "Mudanza" o "Relocalización" -> SERVICE_RELOCATION
+      - "Recableado" o "Recableado Genérico" -> SERVICE_REWIRING
+      - "Residencial" -> RESIDENTIAL
+      - "Corporativo" -> CORPORATE
+      - "Poste" -> POSTE
+      - "Servicio Básico" -> SERVICE_BASIC
+      - "Servicio Corp" -> SERVICE_CORP
+      
+      Tu respuesta debe ser profesional, concisa y confirmatoria. Si el usuario te pide registrar algo nuevo, usa LOGGING. Si te pide borrar el último, usa DELETION con last: true.
     `;
 };
 
-const initializeChat = (modelName: string = "gemini-2.5-flash") => {
+const initializeChat = () => {
     try {
         const aiInstance = getAiInstance();
-        currentModelUsed = modelName;
+        // Use gemini-3-flash-preview for basic text tasks
         chat = aiInstance.chats.create({
-            model: modelName,
+            model: "gemini-3-flash-preview",
             config: {
                 systemInstruction: getSystemInstruction(),
                 responseMimeType: "application/json",
@@ -105,34 +107,32 @@ export const resetChat = () => {
 
 export const validateApiKey = async (rawApiKey: string): Promise<{valid: boolean; error?: string}> => {
   const apiKey = cleanApiKey(rawApiKey);
-  if (!apiKey || apiKey.length < 30) {
-      return { valid: false, error: "⚠️ La Key parece incompleta." };
-  }
-  const testModel = async (modelName: string) => {
-    const testAI = new GoogleGenAI({ apiKey });
-    await testAI.models.generateContent({ model: modelName, contents: "Hi" });
-  };
+  if (!apiKey || apiKey.length < 30) return { valid: false, error: "Key inválida" };
   try {
-    await testModel("gemini-2.5-flash");
+    const testAI = new GoogleGenAI({ apiKey });
+    // Use the latest flash model for testing
+    await testAI.models.generateContent({ 
+      model: "gemini-3-flash-preview", 
+      contents: "Hi" 
+    });
     return { valid: true };
   } catch (e: any) {
-    return { valid: false, error: "Error de validación." };
+    return { valid: false, error: "Error de validación" };
   }
 };
 
 export const processUserMessage = async (message: string, records: InstallationRecord[]): Promise<ExtractedData> => {
-  if (!navigator.onLine) {
-    return { intent: 'GENERAL_CHAT', records: [], jarvisResponse: "⚠️ IA Offline." };
-  }
+  if (!navigator.onLine) return { intent: 'GENERAL_CHAT', records: [], jarvisResponse: "IA Offline." };
   try {
-    if (!chat) initializeChat("gemini-2.5-flash");
-    if (!chat) throw new Error("API_KEY_MISSING");
+    if (!chat) initializeChat();
+    if (!chat) throw new Error("Chat no inicializado");
 
-    const response = await chat.sendMessage({ message: `MENSAJE: "${message}"` });
-    const text = response.text;
-    if (!text) throw new Error("No response");
-    return JSON.parse(text);
+    // Use property text, not method text()
+    const response: GenerateContentResponse = await chat.sendMessage({ message: `MENSAJE: "${message}"` });
+    const jsonStr = response.text || "{}";
+    return JSON.parse(jsonStr.trim());
   } catch (error: any) {
+    console.error("Gemini API Error:", error);
     return { intent: 'GENERAL_CHAT', records: [], jarvisResponse: "Error de conexión." };
   }
 };

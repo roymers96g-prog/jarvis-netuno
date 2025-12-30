@@ -6,10 +6,11 @@ const USER_ID_KEY = 'netuno_device_user_id';
 
 const DEFAULT_SETTINGS: AppSettings = {
   nickname: '', 
-  profile: 'INSTALLER', // Default profile
+  profile: 'INSTALLER', 
   apiKey: '',   
   ttsEnabled: true,
   theme: 'dark',
+  highContrast: false, // Recomendación 5: Modo exteriores
   monthlyGoal: 0,
   customPrices: { ...DEFAULT_PRICES },
   voiceSettings: {
@@ -19,7 +20,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   }
 };
 
-// Genera o recupera un ID único para este usuario/dispositivo
 export const getUserId = (): string => {
   let userId = localStorage.getItem(USER_ID_KEY);
   if (!userId) {
@@ -35,7 +35,6 @@ export const getSettings = (): AppSettings => {
     if (!data) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(data);
     
-    // Robust merge to ensure nested objects like voiceSettings and customPrices exist
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
@@ -60,17 +59,16 @@ export const getAllPrices = () => {
   return getSettings().customPrices;
 };
 
-// Helper to get effective key (User Setting > Environment Variable)
-// FIX: Vite uses import.meta.env and variables must start with VITE_
+// Use process.env.API_KEY as the primary source of truth
 export const getEffectiveApiKey = (): string => {
-  const settings = getSettings();
+  if (process.env.API_KEY && process.env.API_KEY.length > 10) {
+    return process.env.API_KEY.trim();
+  }
   
-  // 1. Prioridad: Llave manual guardada en configuración
+  const settings = getSettings();
   if (settings.apiKey && settings.apiKey.trim().length > 10) {
     return settings.apiKey.trim();
   }
   
-  // 2. Fallback: Variable de entorno (Vercel/Vite)
-  // Debe llamarse VITE_GOOGLE_API_KEY en Vercel
   return (import.meta as any).env?.VITE_GOOGLE_API_KEY || '';
 };
